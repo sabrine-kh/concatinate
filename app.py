@@ -491,15 +491,25 @@ else:
 
         # --- Stage 1: Web Extraction --- 
         if scraped_table_html:
-            cols = st.columns(2) # For displaying progress
+            # Initialize columns for displaying progress
+            cols = st.columns(2)
             col_index = 0
             SLEEP_INTERVAL_SECONDS = 0.2 # Can potentially be lower for web chain
 
+            # Initialize results storage
+            intermediate_results = {}  # Store stage 1 results {prompt_name: {result_data}}
+            pdf_fallback_needed = []   # List of prompt_names needing stage 2
+
+            # Process each prompt
             for prompt_name, instructions in prompts_to_run.items():
                 attribute_key = prompt_name
                 web_instruction = instructions["web"]
+                
+                # Get current column for display
                 current_col = cols[col_index % 2]
                 col_index += 1
+                
+                # Initialize variables for this iteration
                 json_result_str = None
                 run_time = 0.0
                 source = "Web"
@@ -527,7 +537,7 @@ else:
                             logger.error(f"Error during Stage 1 (Web) call for '{attribute_key}': {e}", exc_info=True)
                             json_result_str = f'{{"error": "Exception during Stage 1 call: {e}"}}'
                             run_time = time.time() - start_time
-                
+
                 # --- Basic Parsing of Stage 1 Result --- 
                 final_answer_value = "Error"
                 parse_error = None
@@ -613,6 +623,9 @@ else:
         else: # No scraped HTML, all attributes need PDF fallback
             logger.info("No scraped web data available. All attributes will use PDF extraction.")
             pdf_fallback_needed = list(prompts_to_run.keys())
+            # Initialize results storage
+            intermediate_results = {}  # Store stage 1 results {prompt_name: {result_data}}
+            
             # Populate intermediate results with placeholders indicating skipped web stage
             for prompt_name in pdf_fallback_needed:
                  intermediate_results[prompt_name] = {
