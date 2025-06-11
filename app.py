@@ -371,7 +371,7 @@ st.header("2. Extracted Information")
 def get_or_create_eventloop():
     """Get the current event loop or create a new one"""
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_eventloop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -645,11 +645,16 @@ else:
         if not pdf_fallback_needed:
             st.success("Stage 1 extraction successful for all attributes from web data.")
         else:
+            # Initialize columns for Stage 2
+            cols = st.columns(2)
+            
             for prompt_name in pdf_fallback_needed:
-                attribute_key = prompt_name
+                attribute_key = prompt_name  # Initialize attribute_key from prompt_name
                 pdf_instruction = prompts_to_run[attribute_key]["pdf"] # Get specific PDF instruction
                 current_col = cols[col_index % 2]
                 col_index += 1
+                
+                # Initialize variables for this iteration
                 json_result_str = None
                 run_time = 0.0
                 source = "PDF" # Source for this stage
