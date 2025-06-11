@@ -163,12 +163,8 @@ if 'web_chain' not in st.session_state:
 #     st.session_state.extraction_chain = None
 if 'processed_files' not in st.session_state:
     st.session_state.processed_files = [] # Store names of processed files
-# Add state for evaluation
 if 'evaluation_results' not in st.session_state:
     st.session_state.evaluation_results = [] # List to store detailed results per field
-if 'evaluation_metrics' not in st.session_state:
-    st.session_state.evaluation_metrics = None # Dict to store summary metrics
-# Add flag to track if extraction has run for the current data
 if 'extraction_performed' not in st.session_state:
     st.session_state.extraction_performed = False
 if 'scraped_table_html_cache' not in st.session_state:
@@ -227,7 +223,6 @@ if embedding_function is None or llm is None:
 # Reset evaluation state when processing new files
 def reset_evaluation_state():
     st.session_state.evaluation_results = []
-    st.session_state.evaluation_metrics = None
     st.session_state.extraction_performed = False # Reset the flag here too
     st.session_state.scraped_table_html_cache = None # Clear scraped HTML cache
     st.session_state.current_part_number_scraped = None # Clear scraped part number tracker
@@ -740,233 +735,52 @@ else:
             # st.rerun() # REMOVE/COMMENT OUT to keep cards visible (even on error)
 
 
-    # --- Block 2: Display Ground Truth / Metrics (if results exist) ---
-    # This part needs the 'Source' column re-added for display
+    # --- Block 2: Display Results (if they exist) ---
     if st.session_state.evaluation_results:
         st.divider()
-        st.header("3. Enter Ground Truth & Evaluate")
+        st.header("3. Extraction Results")
 
         results_df = pd.DataFrame(st.session_state.evaluation_results)
         if 'Source' not in results_df.columns:
              results_df['Source'] = 'Unknown' # Add placeholder if missing
 
-        st.info("Enter the correct 'Ground Truth' value for each field below. Leave blank if the field shouldn't exist or 'NOT FOUND' is correct.")
-
-        disabled_cols = [col for col in results_df.columns if col != 'Ground Truth']
-        column_order = [ # Add Source back
-            'Prompt Name', 'Extracted Value', 'Ground Truth', 'Source',
-            'Is Success', 'Is Error', 'Is Not Found', 'Is Rate Limit',
-            'Latency (s)', 'Exact Match', 'Case-Insensitive Match'
-        ]
-
-        edited_df = st.data_editor(
+        # Display results without metrics
+        st.dataframe(
             results_df,
-            key="gt_editor",
             use_container_width=True,
-            num_rows="dynamic",
-            disabled=disabled_cols,
-            column_order=column_order,
-            column_config={ # Add Source back
-                 "Prompt Name": st.column_config.TextColumn(width="medium"),
-                 "Extracted Value": st.column_config.TextColumn(width="medium"),
-                 "Ground Truth": st.column_config.TextColumn(width="medium", help="Enter the correct value here"),
-                 "Source": st.column_config.TextColumn(width="small"), # Show source
-                 "Is Success": st.column_config.CheckboxColumn("Success?", width="small"),
-                 "Is Error": st.column_config.CheckboxColumn("Error?", width="small"),
-                 "Is Not Found": st.column_config.CheckboxColumn("Not Found?", width="small"),
-                 "Is Rate Limit": st.column_config.CheckboxColumn("Rate Limit?", width="small"),
-                 "Latency (s)": st.column_config.NumberColumn(format="%.2f", width="small"),
-                 "Exact Match": st.column_config.CheckboxColumn("Exact?", width="small"),
-                 "Case-Insensitive Match": st.column_config.CheckboxColumn("Case-Ins?", width="small"),
-                 "Raw Output": None,
-                 "Parse Error": None
+            hide_index=True,
+            column_config={
+                "Prompt Name": st.column_config.TextColumn(width="medium"),
+                "Extracted Value": st.column_config.TextColumn(width="medium"),
+                "Source": st.column_config.TextColumn(width="small"),
+                "Raw Output": st.column_config.TextColumn("Raw Output", width="large"),
+                "Parse Error": st.column_config.TextColumn("Parse Error", width="medium")
             }
         )
 
-        calculate_button = st.button("📊 Calculate Metrics", key="calc_metrics", type="primary")
-
-        if calculate_button:
-            # --- Metric Calculation Logic --- 
-            final_results_list = edited_df.to_dict('records')
-            total_fields = len(final_results_list)
-            success_count = 0
-            error_count = 0
-            not_found_count = 0 # Counts final NOT FOUND results
-            rate_limit_count = 0
-            exact_match_count = 0
-            case_insensitive_match_count = 0
-            total_latency = 0.0
-            valid_latency_count = 0 # Count fields where latency is meaningful
-
-            for result in final_results_list:
-                extracted = str(result['Extracted Value']).strip()
-                ground_truth = str(result['Ground Truth']).strip()
-
-                # Normalize "NOT FOUND" variations for comparison
-                # Handle the placeholder from skipped web stage
-                if extracted == "(Web Stage Skipped)":
-                    extracted_norm = "NOT FOUND" # Treat skipped as NOT FOUND for comparison
-                else:
-                    extracted_norm = "NOT FOUND" if "not found" in extracted.lower() else extracted
-                gt_norm = "NOT FOUND" if "not found" in ground_truth.lower() else ground_truth
-                gt_norm = "NOT FOUND" if ground_truth == "" else gt_norm # Treat empty GT as NOT FOUND
-
-                # Calculate matches
-                is_exact_match = False
-                is_case_insensitive_match = False
-
-                # Only calculate accuracy if not an error/rate limit and GT provided
-                # Also exclude the placeholder value from accuracy calculation
-                if not result['Is Error'] and not result['Is Rate Limit'] and extracted != "(Web Stage Skipped)":
-                    if extracted_norm == gt_norm:
-                        is_exact_match = True
-                        is_case_insensitive_match = True # Exact implies case-insensitive
-                        if gt_norm != "NOT FOUND": # Count matches only if GT wasn't NOT FOUND
-                            exact_match_count += 1
-                            case_insensitive_match_count += 1
-                    elif extracted_norm.lower() == gt_norm.lower():
-                        is_case_insensitive_match = True
-                        if gt_norm != "NOT FOUND":
-                             case_insensitive_match_count += 1
-
-                result['Exact Match'] = is_exact_match
-                result['Case-Insensitive Match'] = is_case_insensitive_match
-
-                # Count outcomes (based on final result)
-                if result['Is Success']: success_count += 1
-                if result['Is Error']: error_count += 1
-                if result['Is Not Found']: not_found_count += 1
-                if result['Is Rate Limit']: rate_limit_count += 1
-
-                # Sum latency
-                if isinstance(result['Latency (s)'], (int, float)):
-                    total_latency += result['Latency (s)']
-                    valid_latency_count += 1
-
-
-            # Calculate overall metrics
-            # Adjust denominator: fields where accuracy could be measured
-            # Exclude errors, rate limits, and final NOT FOUND results
-            accuracy_denominator = total_fields - error_count - rate_limit_count - not_found_count
-
-            st.session_state.evaluation_metrics = {
-                "Total Fields": total_fields,
-                "Success Count": success_count,
-                "Error Count": error_count,
-                "Not Found Count (Final)": not_found_count, # Renamed for clarity
-                "Rate Limit Count": rate_limit_count,
-                "Exact Match Count": exact_match_count,
-                "Case-Insensitive Match Count": case_insensitive_match_count,
-                "Accuracy Denominator": accuracy_denominator,
-                "Success Rate (%)": (success_count / total_fields * 100) if total_fields > 0 else 0,
-                "Error Rate (%)": (error_count / total_fields * 100) if total_fields > 0 else 0,
-                "Not Found Rate (%)": (not_found_count / total_fields * 100) if total_fields > 0 else 0,
-                "Rate Limit Rate (%)": (rate_limit_count / total_fields * 100) if total_fields > 0 else 0,
-                "Exact Match Accuracy (%)": (exact_match_count / accuracy_denominator * 100) if accuracy_denominator > 0 else 0,
-                "Case-Insensitive Accuracy (%)": (case_insensitive_match_count / accuracy_denominator * 100) if accuracy_denominator > 0 else 0,
-                "Average Latency (s)": (total_latency / valid_latency_count) if valid_latency_count > 0 else 0,
-            }
-
-            # Update the main results list with comparison outcomes
-            st.session_state.evaluation_results = final_results_list
-            st.success("Metrics calculated successfully!")
-            # st.rerun() # REMOVE/COMMENT OUT to keep cards visible
-
-        # --- Display Metrics Section --- 
-        st.divider()
-        st.header("4. Evaluation Metrics")
-        if st.session_state.evaluation_metrics:
-            metrics = st.session_state.evaluation_metrics
-            st.subheader("Summary Statistics")
-
-            m_cols = st.columns(4)
-            m_cols[0].metric("Total Fields", metrics["Total Fields"])
-            m_cols[1].metric("Success Rate", f"{metrics['Success Rate (%)']:.1f}%", delta=f"{metrics['Success Count']} fields", delta_color="off")
-            m_cols[2].metric("Error Rate", f"{metrics['Error Rate (%)']:.1f}%", delta=f"{metrics['Error Count']} fields", delta_color="inverse" if metrics['Error Count'] > 0 else "off")
-            # Clarify latency delta
-            valid_calls = metrics["Total Fields"] - metrics["Rate Limit Count"]
-            m_cols[3].metric("Avg Latency", f"{metrics['Average Latency (s)']:.2f}s", delta=f"over {valid_calls} calls", delta_color="off")
-
-            m_cols2 = st.columns(4)
-            # Use the accuracy denominator in help text
-            m_cols2[0].metric("Exact Match Acc.", f"{metrics['Exact Match Accuracy (%)']:.1f}%", help=f"Based on {metrics['Accuracy Denominator']} fields (excluding errors, rate limits, and final 'NOT FOUND' results)")
-            m_cols2[1].metric("Case-Insensitive Acc.", f"{metrics['Case-Insensitive Accuracy (%)']:.1f}%")
-            m_cols2[2].metric("Final 'NOT FOUND' Rate", f"{metrics['Not Found Rate (%)']:.1f}%", delta=f"{metrics['Not Found Count (Final)']} fields", delta_color="off")
-            m_cols2[3].metric("Rate Limit Hits", f"{metrics['Rate Limit Count']}", delta_color="inverse" if metrics['Rate Limit Count'] > 0 else "off")
-
-
-            st.subheader("Detailed Results")
-            # Display final results including Source
-            detailed_df = pd.DataFrame(st.session_state.evaluation_results)
-            if 'Source' not in detailed_df.columns:
-                 detailed_df['Source'] = 'Unknown'
-
-            st.dataframe(
-                detailed_df,
-                use_container_width=True,
-                hide_index=True,
-                 column_config={ # Add Source back
-                     "Prompt Name": st.column_config.TextColumn(width="medium"),
-                     "Extracted Value": st.column_config.TextColumn(width="medium"),
-                     "Ground Truth": st.column_config.TextColumn(width="medium"),
-                     "Source": st.column_config.TextColumn(width="small"), # Show source
-                     "Is Success": st.column_config.CheckboxColumn("Success?",width="small"),
-                     "Is Error": st.column_config.CheckboxColumn("Error?", width="small"),
-                     "Is Not Found": st.column_config.CheckboxColumn("Not Found?", width="small"),
-                     "Is Rate Limit": st.column_config.CheckboxColumn("Rate Limit?", width="small"),
-                     "Latency (s)": st.column_config.NumberColumn(format="%.2f", width="small"),
-                     "Exact Match": st.column_config.CheckboxColumn("Exact?", width="small"),
-                     "Case-Insensitive Match": st.column_config.CheckboxColumn("Case-Ins?", width="small"),
-                     "Raw Output": st.column_config.TextColumn("Raw Output", width="large"),
-                     "Parse Error": st.column_config.TextColumn("Parse Error", width="medium")
-                }
-            )
-
-        else:
-            st.info("Calculate metrics after entering ground truth to see results here.")
-
-
         # --- Export Section --- 
         st.divider()
-        st.header("5. Export Results")
+        st.header("4. Export Results")
 
-        if st.session_state.evaluation_results:
-            # Prepare data for export
-            export_df = pd.DataFrame(st.session_state.evaluation_results)
-            export_summary = st.session_state.evaluation_metrics if st.session_state.evaluation_metrics else {}
+        # Prepare data for export
+        export_df = pd.DataFrame(st.session_state.evaluation_results)
 
-            # Convert DataFrame to CSV
-            @st.cache_data # Cache the conversion
-            def convert_df_to_csv(df):
-                return df.to_csv(index=False).encode('utf-8')
+        # Convert DataFrame to CSV
+        @st.cache_data # Cache the conversion
+        def convert_df_to_csv(df):
+            return df.to_csv(index=False).encode('utf-8')
 
-            csv_data = convert_df_to_csv(export_df)
+        csv_data = convert_df_to_csv(export_df)
 
-            # Convert summary dict to JSON
-            json_summary_data = json.dumps(export_summary, indent=2).encode('utf-8')
-
-            export_cols = st.columns(2)
-            with export_cols[0]:
-                st.download_button(
-                    label="📥 Download Detailed Results (CSV)",
-                    data=csv_data,
-                    file_name='detailed_extraction_results.csv',
-                    mime='text/csv',
-                    key='download_csv'
-                )
-            with export_cols[1]:
-                 st.download_button(
-                    label="📥 Download Summary Metrics (JSON)",
-                    data=json_summary_data,
-                    file_name='evaluation_summary.json',
-                    mime='application/json',
-                    key='download_json'
-                )
-        else:
-            st.info("Process documents and calculate metrics to enable export.")
+        st.download_button(
+            label="📥 Download Results (CSV)",
+            data=csv_data,
+            file_name='extraction_results.csv',
+            mime='text/csv',
+            key='download_csv'
+        )
 
     # --- Block 3: Handle cases where extraction ran but yielded nothing, or hasn't run ---
-    # This logic might need review depending on how Stage 1/2 errors are handled
     elif (st.session_state.pdf_chain or st.session_state.web_chain) and st.session_state.extraction_performed:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
     
