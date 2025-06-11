@@ -20,6 +20,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add navigation button at the top
+if st.sidebar.button("← Back to Main App", use_container_width=True):
+    st.switch_page("../app.py")
+
 # --- Configuration ---
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]

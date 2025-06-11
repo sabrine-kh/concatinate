@@ -265,6 +265,10 @@ if st.session_state.retriever is None and config.CHROMA_SETTINGS.is_persistent a
 with st.sidebar:
     st.header("1. Document Processing")
     
+    # Add Chatbot Button
+    if st.button("🤖 Open Chatbot in New Page", type="primary", use_container_width=True):
+        st.switch_page("pages/chatbot.py")
+    
     uploaded_files = st.file_uploader(
         "Upload PDF Files",
         type="pdf",
