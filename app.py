@@ -263,6 +263,11 @@ if not config.GROQ_API_KEY:
 # --- Sidebar for PDF Upload and Processing ---
 with st.sidebar:
     st.header("1. Document Processing")
+    
+    # Add Chatbot Button
+    if st.button("🤖 Open Chatbot", type="primary", use_container_width=True):
+        st.switch_page("chatbot.py")  # This will switch to the chatbot page
+    
     uploaded_files = st.file_uploader(
         "Upload PDF Files",
         type="pdf",
