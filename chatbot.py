@@ -1,15 +1,22 @@
-# Add navigation button at the top
-if st.sidebar.button("← Back to Main App", use_container_width=True):
-    st.switch_page("../app.py")
 
-# Initialize Supabase credentials
-supabase_url = st.secrets["SUPABASE_URL"]
-supabase_key = st.secrets["SUPABASE_KEY"]
-groq_api_key = st.secrets["GROQ_API_KEY"]
+# Groq API key
+GROQ_API_KEY = "your_groq_api_key_here"
+import streamlit as st
+import ast
+import os
+import time
+import json
+import unicodedata
+import re
+from io import StringIO
+import contextlib
+from supabase import create_client, Client
+from sentence_transformers import SentenceTransformer
+from groq import Groq
 
 # Initialize Streamlit
 st.set_page_config(
-    page_title="Chatbot",
+    page_title="LEOparts Chatbot",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -17,7 +24,10 @@ st.set_page_config(
 
 # --- Configuration ---
 try:
-    if not all([supabase_url, supabase_key, groq_api_key]):
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_SERVICE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY, GROQ_API_KEY]):
         raise ValueError("One or more secrets not found.")
 except Exception as e:
     st.error(f"Error loading secrets: {e}")
@@ -42,7 +52,7 @@ VECTOR_MATCH_COUNT = 3
 
 # --- Initialize Clients ---
 try:
-    supabase: Client = create_client(supabase_url, supabase_key)
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     st.success("Supabase client initialized.")
 except Exception as e:
     st.error(f"Error initializing Supabase client: {e}")
@@ -59,7 +69,7 @@ except Exception as e:
     st.stop()
 
 try:
-    groq_client = Groq(api_key=groq_api_key)
+    groq_client = Groq(api_key=GROQ_API_KEY)
     st.success("Groq client initialized.")
 except Exception as e:
     st.error(f"Error initializing Groq client: {e}")
@@ -353,85 +363,86 @@ def get_groq_chat_response(prompt, context_provided=True):
 # ───────────────────────────────────────────────────────────────────────────
 #  MAIN CHAT LOOP
 # ───────────────────────────────────────────────────────────────────────────
-def run_chatbot():
-    st.title("🤖 Chatbot")
-    st.markdown("Ask questions about the extracted data.")
-    
-    # Initialize chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+st.title("LEOparts Standards & Attributes Chatbot")
+st.markdown("Ask questions about LEOparts standards and attributes.")
 
-    # Display chat history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+# Add a button to go back to the main app
+if st.button("← Back to Main App", type="secondary"):
+    st.switch_page("app.py")
 
-    # Chat input
-    if prompt := st.chat_input("What would you like to know?"):
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+leoni_attributes_schema_for_main_loop = """(id: bigint, Number: text, Name: text, "Object Type Indicator": text, Context: text, Version: text, State: text, "Last Modified": timestamp with time zone, "Created On": timestamp with time zone, "Sourcing Status": text, "Material Filling": text, "Material Name": text, "Max. Working Temperature [°C]": numeric, "Min. Working Temperature [°C]": numeric, Colour: text, "Contact Systems": text, Gender: text, "Housing Seal": text, "HV Qualified": text, "Length [mm]": numeric, "Mechanical Coding": text, "Number Of Cavities": numeric, "Number Of Rows": numeric, "Pre-assembled": text, Sealing: text, "Sealing Class": text, "Terminal Position Assurance": text, "Type Of Connector": text, "Width [mm]": numeric, "Wire Seal": text, "Connector Position Assurance": text, "Colour Coding": text, "Set/Kit": text, "Name Of Closed Cavities": text, "Pull-To-Seat": text, "Height [mm]": numeric, Classification: text)"""
 
-        # Process the query
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                relevant_markdown_chunks = []
-                relevant_attribute_rows = []
-                context_was_found = False
-                generated_sql = None
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-                # 1. Attempt Text-to-SQL generation
-                generated_sql = generate_sql_from_query(prompt, leoni_attributes_schema_for_main_loop)
+# Display chat history
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-                # 2. Execute SQL (using client-side filters)
-                if generated_sql:
-                    relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
-                    if relevant_attribute_rows:
+# Chat input
+if prompt := st.chat_input("What would you like to know?"):
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Process the query
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            relevant_markdown_chunks = []
+            relevant_attribute_rows = []
+            context_was_found = False
+            generated_sql = None
+
+            # 1. Attempt Text-to-SQL generation
+            generated_sql = generate_sql_from_query(prompt, leoni_attributes_schema_for_main_loop)
+
+            # 2. Execute SQL (using client-side filters)
+            if generated_sql:
+                relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
+                if relevant_attribute_rows:
+                    context_was_found = True
+
+            # 3. Perform Vector Search (can be conditional)
+            run_vector_search = True
+            if run_vector_search:
+                query_embedding = get_query_embedding(prompt)
+                if query_embedding:
+                    relevant_markdown_chunks = find_relevant_markdown_chunks(query_embedding)
+                    if relevant_markdown_chunks:
                         context_was_found = True
 
-                # 3. Perform Vector Search (can be conditional)
-                run_vector_search = True
-                if run_vector_search:
-                    query_embedding = get_query_embedding(prompt)
-                    if query_embedding:
-                        relevant_markdown_chunks = find_relevant_markdown_chunks(query_embedding)
-                        if relevant_markdown_chunks:
-                            context_was_found = True
+            # 4. Prepare Context
+            context_str = format_context(relevant_markdown_chunks, relevant_attribute_rows)
 
-                # 4. Prepare Context
-                context_str = format_context(relevant_markdown_chunks, relevant_attribute_rows)
-
-                # 5. Generate Response
-                prompt_for_llm = f"""Context:
+            # 5. Generate Response
+            prompt_for_llm = f"""Context:
 {context_str}
 
 User Question: {prompt}
 
 Answer the user question based *only* on the provided context."""
-                llm_response = get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
-                
-                # Display the response
-                st.markdown(llm_response)
-                
-                # Add assistant response to chat history
-                st.session_state.messages.append({"role": "assistant", "content": llm_response})
+            llm_response = get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
+            
+            # Display the response
+            st.markdown(llm_response)
+            
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": llm_response})
 
-    # Add a sidebar with information about the models being used
-    with st.sidebar:
-        st.header("Model Information")
-        st.markdown("""
-        - **SQL Generation Model**: qwen-qwq-32b
-        - **Answer Generation Model**: qwen-qwq-32b
-        - **Embedding Model**: sentence-transformers/all-MiniLM-L6-v2
-        """)
-        
-        st.header("Search Parameters")
-        st.markdown("""
-        - **Vector Similarity Threshold**: 0.4
-        - **Vector Match Count**: 3
-        """)
-
-# The chatbot will be called from app.py
-if __name__ == "__main__":
-    run_chatbot() 
+# Add a sidebar with information about the models being used
+with st.sidebar:
+    st.header("Model Information")
+    st.markdown("""
+    - **SQL Generation Model**: qwen-qwq-32b
+    - **Answer Generation Model**: qwen-qwq-32b
+    - **Embedding Model**: sentence-transformers/all-MiniLM-L6-v2
+    """)
+    
+    st.header("Search Parameters")
+    st.markdown("""
+    - **Vector Similarity Threshold**: 0.4
+    - **Vector Match Count**: 3
+    """) 

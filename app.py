@@ -143,7 +143,7 @@ from extraction_prompts_web import (
 
 # --- Streamlit Page Configuration ---
 st.set_page_config(
-    page_title="PDF Auto-Extraction with Groq", # Updated title
+    page_title="PDF Auto-Extraction with Groq",
     page_icon="📄",
     layout="wide"
 )
@@ -176,6 +176,10 @@ if 'scraped_table_html_cache' not in st.session_state:
     st.session_state.scraped_table_html_cache = None # Cache for scraped HTML for the current part number
 if 'current_part_number_scraped' not in st.session_state:
     st.session_state.current_part_number_scraped = None # Track which part number was last scraped for
+
+# Initialize session state for page navigation
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "extraction"
 
 # --- Global Variables / Initialization ---
 # Initialize embeddings (this is relatively heavy, do it once)
@@ -254,24 +258,18 @@ if st.session_state.retriever is None and config.CHROMA_SETTINGS.is_persistent a
     else:
         logger.warning("No existing persistent vector store found or failed to load.")
 
-# --- UI Layout ---
-persistence_enabled = config.CHROMA_SETTINGS.is_persistent
-st.title("📄 PDF Auto-Extraction with Groq") # Updated title
-st.markdown("Upload PDF documents, process them, and view automatically extracted information.") # Updated description
-st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}` | **Persistence:** `{'Enabled' if persistence_enabled else 'Disabled'}`")
-
-# Check for API Key (LLM init already does this, but maybe keep a visual warning)
-if not config.GROQ_API_KEY:
-    st.warning("Groq API Key not found. Please set the GROQ_API_KEY environment variable.", icon="⚠️")
-
-
 # --- Sidebar for PDF Upload and Processing ---
 with st.sidebar:
     st.header("1. Document Processing")
     
     # Add Chatbot Button
     if st.button("🤖 Open Chatbot", type="primary", use_container_width=True):
-        st.switch_page("pages/1_Chatbot.py")  # Updated path to the chatbot page
+        st.session_state.current_page = "chatbot"
+    
+    # Add Back to Extraction Button when in chatbot
+    if st.session_state.current_page == "chatbot":
+        if st.button("← Back to Extraction", use_container_width=True):
+            st.session_state.current_page = "extraction"
     
     uploaded_files = st.file_uploader(
         "Upload PDF Files",
@@ -356,9 +354,9 @@ with st.sidebar:
     # Check if both chains are ready for the full process
     if st.session_state.pdf_chain and st.session_state.web_chain and st.session_state.processed_files:
         st.success(f"Ready. Processed: {', '.join(st.session_state.processed_files)}")
-    elif persistence_enabled and st.session_state.retriever and (not st.session_state.pdf_chain or not st.session_state.web_chain):
+    elif config.CHROMA_SETTINGS.is_persistent and st.session_state.retriever and (not st.session_state.pdf_chain or not st.session_state.web_chain):
          st.warning("Loaded existing data, but failed to create one or both extraction chains.")
-    elif persistence_enabled and st.session_state.retriever:
+    elif config.CHROMA_SETTINGS.is_persistent and st.session_state.retriever:
          st.success(f"Ready. Using existing data loaded from disk.") # Assuming chains created on load
     else:
         st.info("Upload and process PDF documents to view extracted data.")
@@ -823,3 +821,24 @@ else:
 # In the main section, use asyncio.run to run the async function
 if (st.session_state.pdf_chain and st.session_state.web_chain) and not st.session_state.extraction_performed:
     asyncio.run(process_extraction())
+
+# Main content area with conditional rendering
+if st.session_state.current_page == "extraction":
+    # --- UI Layout ---
+    persistence_enabled = config.CHROMA_SETTINGS.is_persistent
+    st.title("📄 PDF Auto-Extraction with Groq")
+    st.markdown("Upload PDF documents, process them, and view automatically extracted information.")
+    st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}` | **Persistence:** `{'Enabled' if persistence_enabled else 'Disabled'}`")
+
+    # Check for API Key
+    if not config.GROQ_API_KEY:
+        st.warning("Groq API Key not found. Please set the GROQ_API_KEY environment variable.", icon="⚠️")
+
+    # Run extraction if needed
+    if (st.session_state.pdf_chain and st.session_state.web_chain) and not st.session_state.extraction_performed:
+        asyncio.run(process_extraction())
+    
+elif st.session_state.current_page == "chatbot":
+    # Import and run the chatbot code
+    import pages.1_Chatbot as chatbot
+    chatbot.run_chatbot()
