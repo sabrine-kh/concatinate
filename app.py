@@ -840,5 +840,5 @@ if st.session_state.current_page == "extraction":
     
 elif st.session_state.current_page == "chatbot":
     # Import and run the chatbot code
-    import pages.1_Chatbot as chatbot
+    import pages.chatbot as chatbot
     chatbot.run_chatbot()
