@@ -271,7 +271,7 @@ with st.sidebar:
     
     # Add Chatbot Button
     if st.button("🤖 Open Chatbot", type="primary", use_container_width=True):
-        st.switch_page("chatbot.py")  # This will switch to the chatbot page
+        st.switch_page("pages/1_Chatbot.py")  # Updated path to the chatbot page
     
     uploaded_files = st.file_uploader(
         "Upload PDF Files",
