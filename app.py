@@ -15,6 +15,11 @@ import pandas as pd # Add pandas import
 import re # Import the 're' module for regular expressions
 import asyncio # Add asyncio import
 import subprocess # To run playwright install
+import nest_asyncio # Add nest_asyncio for better async handling
+from streamlit.runtime.scriptrunner import add_script_run_ctx
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
 
 # --- Install Playwright browsers needed by crawl4ai --- 
 # This should run on startup in the Streamlit Cloud environment
@@ -362,14 +367,30 @@ with st.sidebar:
 # --- Main Area for Displaying Extraction Results ---
 st.header("2. Extracted Information")
 
-# --- Get current asyncio event loop --- 
-# Needed for both scraping and running the async extraction chain
-try:
-    loop = asyncio.get_running_loop()
-except RuntimeError:  # 'RuntimeError: There is no current event loop...'
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-# -------------------------------------
+# --- Event loop management ---
+def get_or_create_eventloop():
+    """Get the current event loop or create a new one"""
+    try:
+        loop = asyncio.get_eventloop()
+    except RuntimeError:
+        loop = asyncio.new_eventloop()
+        asyncio.set_event_loop(loop)
+    return loop
+
+def run_async_with_retry(coro):
+    """Run async code with retry logic in case of loop shutdown"""
+    try:
+        loop = get_or_create_eventloop()
+        return loop.run_until_complete(coro)
+    except RuntimeError as e:
+        if "cannot schedule new futures after shutdown" in str(e):
+            # Create new loop and retry
+            loop = get_or_create_eventloop()
+            return loop.run_until_complete(coro)
+        raise
+
+# Initialize the event loop at startup
+get_or_create_eventloop()
 
 # Check if BOTH chains are ready before proceeding
 if not st.session_state.pdf_chain or not st.session_state.web_chain:
@@ -435,7 +456,11 @@ else:
                      try:
                           # Ensure scrape_website_table_html is imported from llm_interface
                           from llm_interface import scrape_website_table_html
+                          # Create new event loop for scraping
+                          loop = asyncio.new_eventloop()
+                          asyncio.set_event_loop(loop)
                           scraped_table_html = loop.run_until_complete(scrape_website_table_html(part_number))
+                          loop.close()
                           scrape_time = time.time() - scrape_start_time
                           if scraped_table_html:
                               logger.success(f"Web scraping successful in {scrape_time:.2f} seconds.")
@@ -459,32 +484,24 @@ else:
              if st.session_state.current_part_number_scraped is not None:
                   st.session_state.scraped_table_html_cache = None
                   st.session_state.current_part_number_scraped = None
-        # --- End Block 1a ---
-
-        # --- Log the result of scraping before Stage 1 --- 
-        logger.debug(f"Cleaned Scraped HTML content passed to Stage 1: {scraped_table_html[:500] if scraped_table_html else 'None'}...")
-        # -------------------------------------------------
-
-        # --- Block 1b: Two-Stage Extraction Logic --- 
-        st.info(f"Running Stage 1 (Web Data Extraction) for {len(prompts_to_run)} attributes...")
-        
-        cols = st.columns(2) # For displaying progress
-        col_index = 0
-        SLEEP_INTERVAL_SECONDS = 0.2 # Can potentially be lower for web chain
-        
-        intermediate_results = {} # Store stage 1 results {prompt_name: {result_data}} 
-        pdf_fallback_needed = [] # List of prompt_names needing stage 2
 
         # --- Stage 1: Web Extraction --- 
         if scraped_table_html:
-            for prompt_name, instructions in prompts_to_run.items(): # Iterate through attributes and their instructions
+            cols = st.columns(2) # For displaying progress
+            col_index = 0
+            SLEEP_INTERVAL_SECONDS = 0.2 # Can potentially be lower for web chain
+            
+            intermediate_results = {} # Store stage 1 results {prompt_name: {result_data}} 
+            pdf_fallback_needed = [] # List of prompt_names needing stage 2
+
+            for prompt_name, instructions in prompts_to_run.items():
                 attribute_key = prompt_name
-                web_instruction = instructions["web"] # Get WEB instruction
+                web_instruction = instructions["web"]
                 current_col = cols[col_index % 2]
                 col_index += 1
                 json_result_str = None
                 run_time = 0.0
-                source = "Web" # Source for this stage
+                source = "Web"
                 
                 with current_col:
                      with st.spinner(f"Stage 1: Extracting {attribute_key} from Web Data..."):
@@ -493,22 +510,22 @@ else:
                             web_input = {
                                 "cleaned_web_data": scraped_table_html,
                                 "attribute_key": attribute_key,
-                                "extraction_instructions": web_instruction # Use specific web instruction
+                                "extraction_instructions": web_instruction
                             }
-                            # --- Log the input to the web chain --- 
-                            logger.debug(f"Invoking web_chain for '{attribute_key}' with input keys: {list(web_input.keys())}")
-                            # -------------------------------------
-                            # Call helper using the web_chain
+                            # Create new event loop for each extraction
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
                             json_result_str = loop.run_until_complete(
                                 _invoke_chain_and_process(st.session_state.web_chain, web_input, f"{attribute_key} (Web)")
                             )
+                            loop.close()
                             run_time = time.time() - start_time
                             logger.info(f"Stage 1 (Web) for '{attribute_key}' took {run_time:.2f} seconds.")
-                            time.sleep(SLEEP_INTERVAL_SECONDS) # Add delay
+                            time.sleep(SLEEP_INTERVAL_SECONDS)
                         except Exception as e:
-                             logger.error(f"Error during Stage 1 (Web) call for '{attribute_key}': {e}", exc_info=True)
-                             json_result_str = f'{{"error": "Exception during Stage 1 call: {e}"}}'
-                             run_time = time.time() - start_time # Record time even on error
+                            logger.error(f"Error during Stage 1 (Web) call for '{attribute_key}': {e}", exc_info=True)
+                            json_result_str = f'{{"error": "Exception during Stage 1 call: {e}"}}'
+                            run_time = time.time() - start_time
                 
                 # --- Log the raw output from the web chain ---
                 logger.debug(f"Raw JSON result string from web_chain for '{attribute_key}': {json_result_str}")
@@ -643,13 +660,16 @@ else:
                                 "attribute_key": attribute_key,
                                 "part_number": part_number if part_number else "Not Provided"
                             }
-                            # Call helper using the pdf_chain
+                            # Create new event loop for each extraction
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
                             json_result_str = loop.run_until_complete(
                                 _invoke_chain_and_process(st.session_state.pdf_chain, pdf_input, f"{attribute_key} (PDF)")
                             )
+                            loop.close()
                             run_time = time.time() - start_time
                             logger.info(f"Stage 2 (PDF) for '{attribute_key}' took {run_time:.2f} seconds.")
-                            time.sleep(SLEEP_INTERVAL_SECONDS) # Add delay
+                            time.sleep(SLEEP_INTERVAL_SECONDS)
                         except Exception as e:
                              logger.error(f"Error during Stage 2 (PDF) call for '{attribute_key}': {e}", exc_info=True)
                              json_result_str = f'{{"error": "Exception during Stage 2 call: {e}"}}'
@@ -791,3 +811,7 @@ else:
     
 
 # REMOVE the previous Q&A section entirely (already done)
+
+# In the main section, use asyncio.run to run the async function
+if (st.session_state.pdf_chain and st.session_state.web_chain) and not st.session_state.extraction_performed:
+    asyncio.run(process_extraction())
