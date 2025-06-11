@@ -148,6 +148,9 @@ st.set_page_config(
     layout="wide"
 )
 
+# Create tabs for navigation
+tab1, tab2 = st.tabs(["📄 PDF Extraction", "🤖 Chatbot"])
+
 # --- Logging Configuration ---
 # Configure Loguru logger (can be more flexible than standard logging)
 # logger.add("logs/app_{time}.log", rotation="10 MB", level="INFO") # Example: Keep file logging if desired
@@ -261,10 +264,6 @@ if st.session_state.retriever is None and config.CHROMA_SETTINGS.is_persistent a
 # --- Sidebar for PDF Upload and Processing ---
 with st.sidebar:
     st.header("1. Document Processing")
-    
-    # Add Chatbot Button
-    if st.button("🤖 Open Chatbot", type="primary", use_container_width=True):
-        st.switch_page("pages/chatbot.py")
     
     uploaded_files = st.file_uploader(
         "Upload PDF Files",

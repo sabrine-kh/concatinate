@@ -73,10 +73,6 @@ except Exception as e:
     st.error(f"Error initializing Groq client: {e}")
     st.stop()
 
-# Add navigation button at the top
-if st.sidebar.button("← Back to Main App", use_container_width=True):
-    st.switch_page("../app.py")
-
 # ───────────────────────────────────────────────────────────────────────────
 # HELPER TO STRIP <think> … </think> FROM GROQ RESPONSES
 # ───────────────────────────────────────────────────────────────────────────
