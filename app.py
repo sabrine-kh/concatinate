@@ -496,10 +496,6 @@ else:
             col_index = 0
             SLEEP_INTERVAL_SECONDS = 0.2 # Can potentially be lower for web chain
 
-            # Initialize results storage
-            intermediate_results = {}  # Store stage 1 results {prompt_name: {result_data}}
-            pdf_fallback_needed = []   # List of prompt_names needing stage 2
-
             # Process each prompt
             for prompt_name, instructions in prompts_to_run.items():
                 attribute_key = prompt_name
@@ -623,9 +619,6 @@ else:
         else: # No scraped HTML, all attributes need PDF fallback
             logger.info("No scraped web data available. All attributes will use PDF extraction.")
             pdf_fallback_needed = list(prompts_to_run.keys())
-            # Initialize results storage
-            intermediate_results = {}  # Store stage 1 results {prompt_name: {result_data}}
-            
             # Populate intermediate results with placeholders indicating skipped web stage
             for prompt_name in pdf_fallback_needed:
                  intermediate_results[prompt_name] = {
