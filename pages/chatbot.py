@@ -1,15 +1,20 @@
-# Add navigation button at the top
-if st.sidebar.button("← Back to Main App", use_container_width=True):
-    st.switch_page("../app.py")
-
-# Initialize Supabase credentials
-supabase_url = st.secrets["SUPABASE_URL"]
-supabase_key = st.secrets["SUPABASE_KEY"]
-groq_api_key = st.secrets["GROQ_API_KEY"]
+# Groq API key
+import streamlit as st
+import ast
+import os
+import time
+import json
+import unicodedata
+import re
+from io import StringIO
+import contextlib
+from supabase import create_client, Client
+from sentence_transformers import SentenceTransformer
+from groq import Groq
 
 # Initialize Streamlit
 st.set_page_config(
-    page_title="Chatbot",
+    page_title="LEOparts Chatbot",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -17,7 +22,10 @@ st.set_page_config(
 
 # --- Configuration ---
 try:
-    if not all([supabase_url, supabase_key, groq_api_key]):
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_SERVICE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY, GROQ_API_KEY]):
         raise ValueError("One or more secrets not found.")
 except Exception as e:
     st.error(f"Error loading secrets: {e}")
@@ -42,7 +50,7 @@ VECTOR_MATCH_COUNT = 3
 
 # --- Initialize Clients ---
 try:
-    supabase: Client = create_client(supabase_url, supabase_key)
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     st.success("Supabase client initialized.")
 except Exception as e:
     st.error(f"Error initializing Supabase client: {e}")
@@ -59,11 +67,15 @@ except Exception as e:
     st.stop()
 
 try:
-    groq_client = Groq(api_key=groq_api_key)
+    groq_client = Groq(api_key=GROQ_API_KEY)
     st.success("Groq client initialized.")
 except Exception as e:
     st.error(f"Error initializing Groq client: {e}")
     st.stop()
+
+# Add navigation button at the top
+if st.sidebar.button("← Back to Main App", use_container_width=True):
+    st.switch_page("../app.py")
 
 # ───────────────────────────────────────────────────────────────────────────
 # HELPER TO STRIP <think> … </think> FROM GROQ RESPONSES

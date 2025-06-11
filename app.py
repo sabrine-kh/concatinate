@@ -264,12 +264,7 @@ with st.sidebar:
     
     # Add Chatbot Button
     if st.button("🤖 Open Chatbot", type="primary", use_container_width=True):
-        st.session_state.current_page = "chatbot"
-    
-    # Add Back to Extraction Button when in chatbot
-    if st.session_state.current_page == "chatbot":
-        if st.button("← Back to Extraction", use_container_width=True):
-            st.session_state.current_page = "extraction"
+        st.switch_page("pages/chatbot.py")
     
     uploaded_files = st.file_uploader(
         "Upload PDF Files",
