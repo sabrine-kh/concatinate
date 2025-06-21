@@ -207,23 +207,23 @@ def main():
         if st.button("📄 Extract a new Part", key="nav_extract"):
             st.switch_page("app.py")  # À adapter si tu as une page dédiée
 
-    # --- Contenu principal centré ---
+    # --- Contenu principal centré avec boutons Streamlit fonctionnels ---
     st.markdown("""
-        <div style='display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;'>
+        <div style='display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;'>
             <h1 style='font-size: 3em; margin-bottom: 0.2em;'>LEOPARTS</h1>
             <h2 style='font-size: 2em; margin-bottom: 0.5em;'>Welcome!</h2>
             <p style='font-size: 1.5em; margin-bottom: 2em;'>Choose a Tool</p>
-            <div style='display: flex; gap: 2em;'>
-                <form action='' method='post'>
-                    <button type='button' onclick="window.location.href='pages/chatbot.py'" style='font-size: 1.2em; padding: 0.7em 2em; border-radius: 10px; border: 1px solid #444; background: #23242a; color: #fff; margin-right: 1em; cursor: pointer;'>💬 Chat with Leoparts</button>
-                </form>
-                <form action='' method='post'>
-                    <button type='button' onclick="window.location.href='app.py'" style='font-size: 1.2em; padding: 0.7em 2em; border-radius: 10px; border: 1px solid #444; background: #23242a; color: #fff; cursor: pointer;'>📄 Extract a new Part</button>
-                </form>
-            </div>
         </div>
     """, unsafe_allow_html=True)
-    # --- Fin de la page d'accueil ---
+    col1, col2, col3 = st.columns([2, 3, 2])
+    with col2:
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("💬 Chat with Leoparts", key="main_chat_btn", use_container_width=True):
+                st.switch_page("chatbot.py")
+        with c2:
+            if st.button("📄 Extract a new Part", key="main_extract_btn", use_container_width=True):
+                st.switch_page("app.py")  # À adapter si tu as une page dédiée
 
     # Initialize session state
     if 'retriever' not in st.session_state:
