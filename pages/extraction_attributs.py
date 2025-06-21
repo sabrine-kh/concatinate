@@ -249,20 +249,12 @@ def main():
                     st.warning("No text could be extracted or processed from the uploaded PDFs.")
         elif process_button:
             st.warning("Please upload at least one PDF file before processing.")
-    st.subheader("Processing Status")
     if st.session_state.pdf_chain and st.session_state.web_chain and st.session_state.processed_files:
         st.success(f"Ready. Processed: {', '.join(st.session_state.processed_files)}")
     elif config.CHROMA_SETTINGS.is_persistent and st.session_state.retriever and (not st.session_state.pdf_chain or not st.session_state.web_chain):
         st.warning("Loaded existing data, but failed to create one or both extraction chains.")
     elif config.CHROMA_SETTINGS.is_persistent and st.session_state.retriever:
         st.success(f"Ready. Using existing data loaded from disk.")
-    else:
-        st.info("Upload and process PDF documents to view extracted data.")
-    st.header("2. Extracted Information")
-    if not st.session_state.pdf_chain or not st.session_state.web_chain:
-        st.info("Upload and process documents using the sidebar to see extracted results here.")
-        return
-    # ... rest of the extraction results rendering code ...
 
 if __name__ == "__main__":
     main() 
