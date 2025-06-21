@@ -1,4 +1,3 @@
-
 # Groq API key
 GROQ_API_KEY = "your_groq_api_key_here"
 import streamlit as st
@@ -13,14 +12,6 @@ import contextlib
 from supabase import create_client, Client
 from sentence_transformers import SentenceTransformer
 from groq import Groq
-
-# Initialize Streamlit
-st.set_page_config(
-    page_title="LEOparts Chatbot",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # --- Configuration ---
 try:
@@ -363,86 +354,78 @@ def get_groq_chat_response(prompt, context_provided=True):
 # ───────────────────────────────────────────────────────────────────────────
 #  MAIN CHAT LOOP
 # ───────────────────────────────────────────────────────────────────────────
-st.title("LEOparts Standards & Attributes Chatbot")
-st.markdown("Ask questions about LEOparts standards and attributes.")
-
-# Add a button to go back to the main app
-if st.button("← Back to Main App", type="secondary"):
-    st.switch_page("app.py")
-
-leoni_attributes_schema_for_main_loop = """(id: bigint, Number: text, Name: text, "Object Type Indicator": text, Context: text, Version: text, State: text, "Last Modified": timestamp with time zone, "Created On": timestamp with time zone, "Sourcing Status": text, "Material Filling": text, "Material Name": text, "Max. Working Temperature [°C]": numeric, "Min. Working Temperature [°C]": numeric, Colour: text, "Contact Systems": text, Gender: text, "Housing Seal": text, "HV Qualified": text, "Length [mm]": numeric, "Mechanical Coding": text, "Number Of Cavities": numeric, "Number Of Rows": numeric, "Pre-assembled": text, Sealing: text, "Sealing Class": text, "Terminal Position Assurance": text, "Type Of Connector": text, "Width [mm]": numeric, "Wire Seal": text, "Connector Position Assurance": text, "Colour Coding": text, "Set/Kit": text, "Name Of Closed Cavities": text, "Pull-To-Seat": text, "Height [mm]": numeric, Classification: text)"""
-
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Display chat history
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Chat input
-if prompt := st.chat_input("What would you like to know?"):
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Process the query
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            relevant_markdown_chunks = []
-            relevant_attribute_rows = []
-            context_was_found = False
-            generated_sql = None
-
-            # 1. Attempt Text-to-SQL generation
-            generated_sql = generate_sql_from_query(prompt, leoni_attributes_schema_for_main_loop)
-
-            # 2. Execute SQL (using client-side filters)
-            if generated_sql:
-                relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
-                if relevant_attribute_rows:
-                    context_was_found = True
-
-            # 3. Perform Vector Search (can be conditional)
-            run_vector_search = True
-            if run_vector_search:
-                query_embedding = get_query_embedding(prompt)
-                if query_embedding:
-                    relevant_markdown_chunks = find_relevant_markdown_chunks(query_embedding)
-                    if relevant_markdown_chunks:
-                        context_was_found = True
-
-            # 4. Prepare Context
-            context_str = format_context(relevant_markdown_chunks, relevant_attribute_rows)
-
-            # 5. Generate Response
-            prompt_for_llm = f"""Context:
-{context_str}
-
-User Question: {prompt}
-
-Answer the user question based *only* on the provided context."""
-            llm_response = get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
-            
-            # Display the response
-            st.markdown(llm_response)
-            
-            # Add assistant response to chat history
-            st.session_state.messages.append({"role": "assistant", "content": llm_response})
-
-# Add a sidebar with information about the models being used
-with st.sidebar:
-    st.header("Model Information")
-    st.markdown("""
-    - **SQL Generation Model**: qwen-qwq-32b
-    - **Answer Generation Model**: qwen-qwq-32b
-    - **Embedding Model**: sentence-transformers/all-MiniLM-L6-v2
-    """)
+def main():
+    """Main function to handle the chatbot interface"""
+    st.title("💬 Ask Questions")
     
-    st.header("Search Parameters")
-    st.markdown("""
-    - **Vector Similarity Threshold**: 0.4
-    - **Vector Match Count**: 3
-    """) 
+    # Add a sidebar with information about the models being used
+    with st.sidebar:
+        st.header("Model Information")
+        st.markdown("""
+        - **SQL Generation Model**: qwen-qwq-32b
+        - **Answer Generation Model**: qwen-qwq-32b
+        - **Embedding Model**: sentence-transformers/all-MiniLM-L6-v2
+        """)
+        
+        st.header("Search Parameters")
+        st.markdown("""
+        - **Vector Similarity Threshold**: 0.4
+        - **Vector Match Count**: 3
+        """)
+    
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Display chat messages from history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Accept user input
+    if prompt := st.chat_input("What would you like to know?"):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Get table schema
+        try:
+            table_schema = supabase.table(ATTRIBUTE_TABLE_NAME).select("*").limit(1).execute()
+            if not table_schema.data:
+                st.error("Could not fetch table schema")
+                return
+            table_schema = table_schema.data[0]
+        except Exception as e:
+            st.error(f"Error fetching table schema: {e}")
+            return
+
+        # Generate SQL from user query
+        generated_sql = generate_sql_from_query(prompt, table_schema)
+        
+        # Get relevant attributes using SQL
+        attribute_rows = []
+        if generated_sql:
+            attribute_rows = find_relevant_attributes_with_sql(generated_sql)
+        
+        # Get query embedding and find relevant markdown chunks
+        query_embedding = get_query_embedding(prompt)
+        markdown_chunks = find_relevant_markdown_chunks(query_embedding)
+        
+        # Format context from both sources
+        context = format_context(markdown_chunks, attribute_rows)
+        
+        # Generate response using Groq
+        response = get_groq_chat_response(prompt, context)
+        
+        # Display assistant response in chat message container
+        with st.chat_message("assistant"):
+            st.markdown(response)
+        
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+if __name__ == "__main__":
+    main() 

@@ -128,7 +128,10 @@ def get_answer_from_llm_langchain(question: str, retriever: VectorStoreRetriever
 #     payload = {
 #         "model": config.LLM_MODEL_NAME, # Use model name from config
 #         "messages": [
-#             {"role": "system", "content": system_prompt},
+#             {"role": "system", "content": 
+# 
+# 
+# },
 #             {"role": "user", "content": user_prompt}
 #         ],
 #         "max_tokens": config.LLM_MAX_OUTPUT_TOKENS,
