@@ -176,30 +176,9 @@ def main():
     # --- Nouvelle page d'accueil stylisée ---
     st.set_page_config(page_title="LEOPARTS", page_icon="🦁", layout="wide")
 
-    # Sidebar customisée
+    # Sidebar navigation only
     with st.sidebar:
         st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
-        st.markdown("""
-        <style>
-        .sidebar-button {
-            display: flex;
-            align-items: center;
-            gap: 0.5em;
-            font-size: 1.1em;
-            background: #23242a;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 10px;
-            padding: 0.5em 1em;
-            margin-bottom: 1em;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .sidebar-button:hover {
-            background: #33343a;
-        }
-        </style>
-        """, unsafe_allow_html=True)
         if st.button("🏠 Home", key="nav_home"):
             st.switch_page("app.py")
         if st.button("💬 Chat with Leoparts", key="nav_chat"):
@@ -207,7 +186,7 @@ def main():
         if st.button("📄 Extract a new Part", key="nav_extract"):
             st.switch_page("pages/extraction_attributs.py")
 
-    # --- Contenu principal centré avec boutons Streamlit fonctionnels ---
+    # Main welcome content
     st.markdown("""
         <div style='display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;'>
             <h1 style='font-size: 3em; margin-bottom: 0.2em;'>LEOPARTS</h1>
@@ -215,6 +194,7 @@ def main():
             <p style='font-size: 1.5em; margin-bottom: 2em;'>Choose a Tool</p>
         </div>
     """, unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([2, 3, 2])
     with col2:
         c1, c2 = st.columns(2)
