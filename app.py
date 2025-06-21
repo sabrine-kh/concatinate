@@ -13,7 +13,7 @@ import streamlit as st
 #     page_title="Connector Data Extraction",
 #     page_icon="🔌",
 #     layout="wide",
-#     initial_sidebar_state="expanded"
+#     initial_sidebar_state="expanded"v
 # )
 
 import os
@@ -173,7 +173,58 @@ def initialize_llm_cached():
         return None
 
 def main():
-    """Main function to run the extraction app"""
+    # --- Nouvelle page d'accueil stylisée ---
+    st.set_page_config(page_title="LEOPARTS", page_icon="🦁", layout="wide")
+
+    # Sidebar customisée
+    with st.sidebar:
+        st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
+        st.markdown("""
+        <style>
+        .sidebar-button {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            font-size: 1.1em;
+            background: #23242a;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 10px;
+            padding: 0.5em 1em;
+            margin-bottom: 1em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .sidebar-button:hover {
+            background: #33343a;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        if st.button("🏠 Home", key="nav_home"):
+            st.experimental_rerun()
+        if st.button("💬 Chat with Leoparts", key="nav_chat"):
+            st.switch_page("pages/chatbot.py")
+        if st.button("📄 Extract a new Part", key="nav_extract"):
+            st.switch_page("app.py")  # À adapter si tu as une page dédiée
+
+    # --- Contenu principal centré ---
+    st.markdown("""
+        <div style='display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;'>
+            <h1 style='font-size: 3em; margin-bottom: 0.2em;'>LEOPARTS</h1>
+            <h2 style='font-size: 2em; margin-bottom: 0.5em;'>Welcome!</h2>
+            <p style='font-size: 1.5em; margin-bottom: 2em;'>Choose a Tool</p>
+            <div style='display: flex; gap: 2em;'>
+                <form action='' method='post'>
+                    <button type='button' onclick="window.location.href='pages/chatbot.py'" style='font-size: 1.2em; padding: 0.7em 2em; border-radius: 10px; border: 1px solid #444; background: #23242a; color: #fff; margin-right: 1em; cursor: pointer;'>💬 Chat with Leoparts</button>
+                </form>
+                <form action='' method='post'>
+                    <button type='button' onclick="window.location.href='app.py'" style='font-size: 1.2em; padding: 0.7em 2em; border-radius: 10px; border: 1px solid #444; background: #23242a; color: #fff; cursor: pointer;'>📄 Extract a new Part</button>
+                </form>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    # --- Fin de la page d'accueil ---
+
     # Initialize session state
     if 'retriever' not in st.session_state:
         st.session_state.retriever = None
