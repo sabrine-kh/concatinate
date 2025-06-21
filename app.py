@@ -201,11 +201,11 @@ def main():
         </style>
         """, unsafe_allow_html=True)
         if st.button("🏠 Home", key="nav_home"):
-            st.experimental_rerun()
+            st.switch_page("app.py")
         if st.button("💬 Chat with Leoparts", key="nav_chat"):
             st.switch_page("pages/chatbot.py")
         if st.button("📄 Extract a new Part", key="nav_extract"):
-            st.switch_page("app.py")  # À adapter si tu as une page dédiée
+            st.switch_page("pages/extraction_attributs.py")
 
     # --- Contenu principal centré avec boutons Streamlit fonctionnels ---
     st.markdown("""
@@ -220,10 +220,10 @@ def main():
         c1, c2 = st.columns(2)
         with c1:
             if st.button("💬 Chat with Leoparts", key="main_chat_btn", use_container_width=True):
-                st.switch_page("chatbot.py")
+                st.switch_page("pages/chatbot.py")
         with c2:
             if st.button("📄 Extract a new Part", key="main_extract_btn", use_container_width=True):
-                st.switch_page("app.py")  # À adapter si tu as une page dédiée
+                st.switch_page("pages/extraction_attributs.py")
 
     # Initialize session state
     if 'retriever' not in st.session_state:
