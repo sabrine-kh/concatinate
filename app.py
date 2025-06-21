@@ -223,10 +223,6 @@ def main():
     if 'current_part_number_scraped' not in st.session_state:
         st.session_state.current_part_number_scraped = None
 
-    # Add a header for the extraction page
-    st.markdown("<h1 style='text-align: center;'>Document Extraction</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Upload and process your documents to extract information</p>", unsafe_allow_html=True)
-    
     # Initialize embeddings
     try:
         logger.info("Attempting to initialize embedding function...")
