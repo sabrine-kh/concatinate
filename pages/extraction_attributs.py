@@ -388,7 +388,6 @@ if st.session_state.retriever is None and config.CHROMA_SETTINGS.is_persistent a
         logger.warning("No existing persistent vector store found or failed to load.")
 
 # --- UI Layout ---
-persistence_enabled = config.CHROMA_SETTINGS.is_persistent
 st.title("📄 PDF Auto-Extraction with Groq") # Updated title
 st.markdown("Upload PDF documents, process them, and view automatically extracted information.") # Updated description
 st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}`")
