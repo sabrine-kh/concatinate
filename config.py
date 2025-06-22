@@ -12,12 +12,12 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # --- Model Configuration ---
 # Recommend using Langchain's Groq integration if possible
 # LLM_PROVIDER = "groq" # or "requests" if using raw requests
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen-qwq-32b") # Reverted to a known good default
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen/qwen3-32b") # Reverted to a known good default
 # LLM_MODEL_NAME = "qwen-qwq-32b" # Your original choice via requests
 # GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions" # Needed if using raw requests
 
 # --- Vision Model Configuration ---
-VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "mistral-medium")
+VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "mistral-")
 
 # --- Embedding Configuration ---
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
@@ -42,7 +42,7 @@ RETRIEVER_K = int(os.getenv("RETRIEVER_K", 4)) # Renamed from RETRIEVER_SEARCH_K
 
 # --- LLM Request Configuration ---
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.1)) # Adjusted default
-LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", 31550))
+LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", 40960))
 
 # --- Logging ---
 # LOG_LEVEL = "INFO" # Can be set via environment if needed
@@ -60,4 +60,4 @@ class SimpleChromaSettings:
         self.is_persistent = persistent_flag
 
 # *** Instantiate the SimpleChromaSettings using the calculated flag ***
-CHROMA_SETTINGS = SimpleChromaSettings(is_persistent) # Pass the calculated boolean here
+CHROMA_SETTINGS = SimpleChromaSettings(is_persistent) # Pass the calculated boolean heremedium
