@@ -883,10 +883,6 @@ Identify approved contact systems using this reasoning chain:
     → REASONING: [Step1] Part number → [Step3] Mapped to MCP → [Step2] Implicit approval
     → CONTACT SYSTEMS: MCP
 
-    \"Compatible with various 2.8mm systems\"
-    → REASONING: [Step1] Vague → [Step5] Non-specific → [Final] NOT FOUND
-    → CONTACT SYSTEMS: NOT FOUND
-
     Output format:
     CONTACT SYSTEMS: [system1,system2,...]
 """
