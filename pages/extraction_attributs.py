@@ -1527,5 +1527,5 @@ def main():
 __all__ = ['main']
 
 # Only run main() if this file is being run directly
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
