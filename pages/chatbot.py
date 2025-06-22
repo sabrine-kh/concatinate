@@ -20,6 +20,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+st.markdown(
+    """<style>
+    [data-testid='stSidebarNav'] {display: none;}
+    </style>""",
+    unsafe_allow_html=True
+)
+
 # Add navigation button at the top
 if st.sidebar.button("← Back to Main App", use_container_width=True):
     st.switch_page("../app.py")

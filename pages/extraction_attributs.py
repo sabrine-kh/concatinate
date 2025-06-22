@@ -18,6 +18,13 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 nest_asyncio.apply()
 
+st.markdown(
+    """<style>
+    [data-testid='stSidebarNav'] {display: none;}
+    </style>""",
+    unsafe_allow_html=True
+)
+
 def install_playwright_browsers():
     logger.info("Checking and installing Playwright browsers if needed...")
     try:
