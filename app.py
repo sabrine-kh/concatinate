@@ -6,9 +6,6 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 # --- End override ---
 
 # app.py
-import streamlit as st
-st.set_option('server.maxUploadSize', 200)  # 200 MB upload limit
-
 # Remove the page config since it's handled by main.py
 # st.set_page_config(
 #     page_title="Connector Data Extraction",
