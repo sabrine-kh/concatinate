@@ -430,30 +430,11 @@ with st.sidebar:
                         pdf_task = asyncio.create_task(
                             process_uploaded_pdfs(uploaded_files, temp_dir)
                         )
-                        
-                        # Start web processing if part number is provided
-                        web_task = None
-                        if st.session_state.get("sidebar_part_number_input"):
-                            web_task = asyncio.create_task(
-                                process_web_urls([st.session_state.get("sidebar_part_number_input")])
-                            )
-                        
-                        # Wait for both tasks to complete
-                        tasks = [pdf_task]
-                        if web_task:
-                            tasks.append(web_task)
-                        
-                        results = await asyncio.gather(*tasks, return_exceptions=True)
-                        
-                        # Process results
+                        # Remove web_task and process_web_urls logic
+                        # Wait for PDF processing to complete
+                        results = await asyncio.gather(pdf_task, return_exceptions=True)
                         pdf_docs = results[0] if not isinstance(results[0], Exception) else []
-                        web_docs = results[1] if len(results) > 1 and not isinstance(results[1], Exception) else []
-                        
-                        # Combine results, prioritizing web docs if available
-                        if web_docs:
-                            return web_docs
                         return pdf_docs
-                    
                     # Run the parallel processing
                     processed_docs = loop.run_until_complete(process_all())
                     
