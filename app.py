@@ -172,17 +172,13 @@ def initialize_llm_cached():
         return None
 
 def main():
-    # --- Nouvelle page d'accueil stylisée ---
     st.set_page_config(page_title="LEOPARTS", page_icon="🦁", layout="wide")
-
-    # Masquer le menu automatique Streamlit dans la sidebar
     st.markdown(
         """<style>
         [data-testid="stSidebarNav"] {display: none;}
         </style>""",
         unsafe_allow_html=True
     )
-
     with st.sidebar:
         st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
         if st.button("🏠 Home"):
@@ -191,8 +187,6 @@ def main():
             st.switch_page("pages/chatbot.py")
         if st.button("📄 Extract a new Part"):
             st.switch_page("pages/extraction_attributs.py")
-
-    # Main welcome content
     st.markdown("""
         <div style='display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;'>
             <h1 style='font-size: 3em; margin-bottom: 0.2em;'>LEOPARTS</h1>
@@ -200,7 +194,6 @@ def main():
             <p style='font-size: 1.5em; margin-bottom: 2em;'>Choose a Tool</p>
         </div>
     """, unsafe_allow_html=True)
-
     col1, col2, col3 = st.columns([2, 3, 2])
     with col2:
         c1, c2 = st.columns(2)
@@ -210,76 +203,6 @@ def main():
         with c2:
             if st.button("📄 Extract a new Part", key="main_extract_btn", use_container_width=True):
                 st.switch_page("pages/extraction_attributs.py")
-
-    # Initialize session state
-    if 'retriever' not in st.session_state:
-        st.session_state.retriever = None
-    if 'pdf_chain' not in st.session_state:
-        st.session_state.pdf_chain = None
-    if 'web_chain' not in st.session_state:
-        st.session_state.web_chain = None
-    if 'processed_files' not in st.session_state:
-        st.session_state.processed_files = []
-    if 'evaluation_results' not in st.session_state:
-        st.session_state.evaluation_results = []
-    if 'extraction_performed' not in st.session_state:
-        st.session_state.extraction_performed = False
-    if 'scraped_table_html_cache' not in st.session_state:
-        st.session_state.scraped_table_html_cache = None
-    if 'current_part_number_scraped' not in st.session_state:
-        st.session_state.current_part_number_scraped = None
-
-    # Initialize embeddings
-    try:
-        logger.info("Attempting to initialize embedding function...")
-        embedding_function = initialize_embeddings()
-        if embedding_function:
-             logger.success("Embedding function initialized successfully.")
-    except Exception as e:
-        logger.error(f"Failed to initialize embeddings: {e}", exc_info=True)
-        st.error(f"Fatal Error: Could not initialize embedding model. Error: {e}")
-        st.stop()
-
-    # Initialize LLM
-    try:
-        logger.info("Attempting to initialize LLM...")
-        llm = initialize_llm_cached()
-        if llm:
-            logger.success("LLM initialized successfully.")
-    except Exception as e:
-         logger.error(f"Failed to initialize LLM: {e}", exc_info=True)
-         st.error(f"Fatal Error: Could not initialize LLM. Error: {e}")
-         st.stop()
-
-    # Check if initializations failed
-    if embedding_function is None or llm is None:
-         if not st.exception: # If st.stop() wasn't called already
-            st.error("Core components (Embeddings or LLM) failed to initialize. Cannot continue.")
-         st.stop()
-
-    # Load existing data if available
-    if st.session_state.retriever is None and config.CHROMA_SETTINGS.is_persistent and embedding_function:
-        logger.info("Attempting to load existing vector store...")
-        st.session_state.retriever = load_existing_vector_store(embedding_function)
-        if st.session_state.retriever:
-            logger.success("Successfully loaded retriever from persistent storage.")
-            st.session_state.processed_files = ["Existing data loaded from disk"]
-            # --- Create BOTH Extraction Chains --- 
-            logger.info("Creating extraction chains from loaded retriever...")
-            st.session_state.pdf_chain = create_pdf_extraction_chain(st.session_state.retriever, llm)
-            st.session_state.web_chain = create_web_extraction_chain(llm)
-            if not st.session_state.pdf_chain or not st.session_state.web_chain:
-                st.warning("Failed to create one or both extraction chains from loaded retriever.")
-            # ------------------------------------
-            # Don't reset evaluation if loading existing data, but ensure extraction hasn't run yet
-            st.session_state.extraction_performed = False # Ensure flag is false on load
-        else:
-            logger.warning("No existing persistent vector store found or failed to load.")
-
-
-
-
-    # ... rest of the extraction results rendering code ...
 
 if __name__ == "__main__":
     main()
