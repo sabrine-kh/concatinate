@@ -388,7 +388,7 @@ with st.sidebar:
     )
 
     # --- Add Part Number Input ---
-    st.text_input("Enter Part Number (Optional):", key="sidebar_part_number_input", value=st.session_state.get("sidebar_part_number_input", ""))
+    st.text_input("Enter Part Number (Optional):", key="part_number_input", value=st.session_state.get("part_number_input", ""))
     # ---------------------------
 
     process_button = st.button("Process Uploaded Documents", key="process_button", type="primary")
@@ -407,46 +407,21 @@ with st.sidebar:
 
             filenames = [f.name for f in uploaded_files]
             logger.info(f"Starting processing for {len(filenames)} files: {', '.join(filenames)}")
-            
-            # Initialize processed_docs
-            processed_docs = []
-            
             # --- PDF Processing ---
             with st.spinner("Processing PDFs... Loading, cleaning, splitting..."):
+                processed_docs = None # Initialize
                 try:
                     start_time = time.time()
                     temp_dir = os.path.join(os.getcwd(), "temp_pdf_files")
-                    
-                    # Create event loop for async processing
-                    try:
-                        loop = asyncio.get_event_loop()
-                    except RuntimeError:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                    
-                    # Start both PDF and web processing in parallel
-                    async def process_all():
-                        # Start PDF processing
-                        pdf_task = asyncio.create_task(
-                            process_uploaded_pdfs(uploaded_files, temp_dir)
-                        )
-                        # Remove web_task and process_web_urls logic
-                        # Wait for PDF processing to complete
-                        results = await asyncio.gather(pdf_task, return_exceptions=True)
-                        pdf_docs = results[0] if not isinstance(results[0], Exception) else []
-                        return pdf_docs
-                    # Run the parallel processing
-                    processed_docs = loop.run_until_complete(process_all())
-                    
+                    processed_docs = process_uploaded_pdfs(uploaded_files, temp_dir)
                     processing_time = time.time() - start_time
-                    logger.info(f"Processing took {processing_time:.2f} seconds.")
+                    logger.info(f"PDF processing took {processing_time:.2f} seconds.")
                 except Exception as e:
-                    logger.error(f"Failed during processing phase: {e}", exc_info=True)
-                    st.error(f"Error during processing: {e}")
-                    processed_docs = []  # Ensure it's empty on error
+                    logger.error(f"Failed during PDF processing phase: {e}", exc_info=True)
+                    st.error(f"Error processing PDFs: {e}")
 
             # --- Vector Store Indexing ---
-            if processed_docs and len(processed_docs) > 0:
+            if processed_docs:
                 logger.info(f"Generated {len(processed_docs)} document chunks.")
                 with st.spinner("Indexing documents in vector store..."):
                     try:
@@ -488,6 +463,10 @@ with st.sidebar:
     # Check if both chains are ready for the full process
     if st.session_state.pdf_chain and st.session_state.web_chain and st.session_state.processed_files:
         st.success(f"Ready. Processed: {', '.join(st.session_state.processed_files)}")
+    elif persistence_enabled and st.session_state.retriever and (not st.session_state.pdf_chain or not st.session_state.web_chain):
+         st.warning("Loaded existing data, but failed to create one or both extraction chains.")
+    elif persistence_enabled and st.session_state.retriever:
+         st.success(f"Ready. Using existing data loaded from disk.") # Assuming chains created on load
     else:
         st.info("Upload and process PDF documents to view extracted data.")
 
@@ -514,7 +493,7 @@ else:
     # --- Block 1: Run Extraction (if needed) --- 
     if (st.session_state.pdf_chain and st.session_state.web_chain) and not st.session_state.extraction_performed:
         # --- Get Part Number --- 
-        part_number = st.session_state.get("sidebar_part_number_input", "").strip()
+        part_number = st.session_state.get("part_number_input", "").strip()
         # ---------------------
 
         # Define the prompts (attribute keys mapped to PDF and WEB instructions)
@@ -1105,408 +1084,3 @@ else:
     
 
 # REMOVE the previous Q&A section entirely (already done)
-
-def process_files(uploaded_files, urls):
-    """Process uploaded files and URLs in parallel."""
-    start_time = time.time()
-    logger.info(f"Starting processing for {len(uploaded_files)} files: {[f.name for f in uploaded_files]}")
-    
-    # Start PDF processing in background if there are PDFs
-    if uploaded_files:
-        st.session_state.pdf_processing_task = process_pdfs_in_background(uploaded_files)
-        st.session_state.pdf_processing_complete = False
-        st.session_state.pdf_processing_results = None
-    
-    # Process web URLs immediately
-    web_docs = []
-    if urls:
-        try:
-            web_docs = process_web_urls(urls)
-            if web_docs:
-                logger.info(f"Successfully processed {len(web_docs)} web documents")
-                # If we have web results, we can use them immediately
-                return web_docs
-        except Exception as e:
-            logger.error(f"Error processing web URLs: {e}")
-    
-    # If no web results or web processing failed, wait for PDF processing
-    if st.session_state.pdf_processing_task and not st.session_state.pdf_processing_complete:
-        try:
-            # Wait for PDF processing to complete
-            pdf_docs = asyncio.run(st.session_state.pdf_processing_task)
-            st.session_state.pdf_processing_complete = True
-            st.session_state.pdf_processing_results = pdf_docs
-            logger.info(f"PDF processing completed with {len(pdf_docs)} documents")
-            return pdf_docs
-        except Exception as e:
-            logger.error(f"Error during PDF processing: {e}")
-            return []
-    
-    # If we have cached PDF results, use them
-    if st.session_state.pdf_processing_results:
-        return st.session_state.pdf_processing_results
-    
-    return []
-
-# Add before the main processing logic
-def update_health_check():
-    """Update the health check timestamp."""
-    st.session_state.last_health_check = time.time()
-
-def check_health_check_timeout():
-    """Check if we're approaching the health check timeout."""
-    if 'last_health_check' not in st.session_state:
-        st.session_state.last_health_check = time.time()
-        return False
-    
-    elapsed = time.time() - st.session_state.last_health_check
-    return elapsed > (config.HEALTH_CHECK_TIMEOUT - config.HEALTH_CHECK_GRACE_PERIOD)
-
-async def _invoke_chain_and_process(chain, input_data, prompt_name):
-    """Invoke the chain and process the results with detailed logging."""
-    logger.info(f"Starting extraction for {prompt_name}")
-    logger.debug(f"Input data for {prompt_name}: {input_data}")
-    
-    try:
-        start_time = time.time()
-        logger.info(f"Calling Mistral API for {prompt_name}")
-        result = await chain.ainvoke(input_data)
-        processing_time = time.time() - start_time
-        logger.info(f"Mistral API response received for {prompt_name} in {processing_time:.2f} seconds")
-        logger.debug(f"Raw Mistral response for {prompt_name}: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Error in Mistral extraction for {prompt_name}: {str(e)}", exc_info=True)
-        raise
-
-async def process_attribute_batch(attributes_batch, chain, is_web=False):
-    """Process a batch of attributes in parallel with detailed logging."""
-    logger.info(f"Starting batch processing for {'web' if is_web else 'PDF'} data")
-    logger.debug(f"Number of attributes in batch: {len(attributes_batch)}")
-    
-    tasks = []
-    for prompt_name, instructions in attributes_batch.items():
-        attribute_key = prompt_name
-        instruction = instructions["web" if is_web else "pdf"]
-        logger.info(f"Creating task for {prompt_name} using {'web' if is_web else 'PDF'} instructions")
-        
-        input_data = {
-            "cleaned_web_data" if is_web else "extraction_instructions": instruction,
-            "attribute_key": attribute_key,
-            "part_number": st.session_state.get("sidebar_part_number_input", "Not Provided")
-        }
-        
-        task = asyncio.create_task(
-            _invoke_chain_and_process(chain, input_data, f"{attribute_key} ({'Web' if is_web else 'PDF'})")
-        )
-        tasks.append((prompt_name, task))
-    
-    results = {}
-    for prompt_name, task in tasks:
-        try:
-            logger.info(f"Waiting for result from {prompt_name}")
-            result = await task
-            results[prompt_name] = result
-            logger.info(f"Successfully processed {prompt_name}")
-            update_health_check()
-        except Exception as e:
-            logger.error(f"Error processing {prompt_name}: {e}", exc_info=True)
-            results[prompt_name] = f'{{"error": "Exception during processing: {e}"}}'
-    
-    logger.info(f"Batch processing completed. Processed {len(results)} attributes")
-    return results
-
-async def process_all_attributes(prompts_to_run, web_chain, pdf_chain, scraped_table_html):
-    """Process all attributes with detailed logging."""
-    logger.info("Starting attribute processing pipeline")
-    logger.debug(f"Number of prompts to run: {len(prompts_to_run)}")
-    
-    intermediate_results = {}
-    pdf_fallback_needed = []
-    
-    # Process web data if available
-    if scraped_table_html:
-        logger.info("Web data available, starting web processing")
-        # Split attributes into batches for parallel processing
-        attribute_batches = [dict(list(prompts_to_run.items())[i:i + config.MAX_PARALLEL_ATTRIBUTES]) 
-                           for i in range(0, len(prompts_to_run), config.MAX_PARALLEL_ATTRIBUTES)]
-        
-        logger.info(f"Split into {len(attribute_batches)} batches for processing")
-        
-        for batch_idx, batch in enumerate(attribute_batches):
-            logger.info(f"Processing batch {batch_idx + 1}/{len(attribute_batches)}")
-            if check_health_check_timeout():
-                logger.warning("Approaching health check timeout, switching to PDF processing")
-                pdf_fallback_needed.extend(batch.keys())
-                continue
-                
-            batch_results = await process_attribute_batch(batch, web_chain, is_web=True)
-            
-            for prompt_name, result in batch_results.items():
-                try:
-                    parsed_json = json.loads(result.strip())
-                    if isinstance(parsed_json, dict):
-                        if prompt_name in parsed_json:
-                            value = str(parsed_json[prompt_name])
-                            if "not found" in value.lower() or value.strip() == "":
-                                logger.info(f"Web extraction failed for {prompt_name}, adding to PDF fallback")
-                                pdf_fallback_needed.append(prompt_name)
-                        elif "error" in parsed_json:
-                            logger.warning(f"Error in web extraction for {prompt_name}: {parsed_json['error']}")
-                            pdf_fallback_needed.append(prompt_name)
-                except:
-                    logger.warning(f"Failed to parse result for {prompt_name}, adding to PDF fallback")
-                    pdf_fallback_needed.append(prompt_name)
-                
-                intermediate_results[prompt_name] = {
-                    'Prompt Name': prompt_name,
-                    'Extracted Value': result,
-                    'Source': 'Web',
-                    'Latency (s)': 0.0
-                }
-    else:
-        logger.info("No web data available, all attributes will be processed with PDF")
-        pdf_fallback_needed = list(prompts_to_run.keys())
-    
-    # Process PDF fallback if needed
-    if pdf_fallback_needed:
-        logger.info(f"Starting PDF fallback processing for {len(pdf_fallback_needed)} attributes")
-        pdf_batches = [pdf_fallback_needed[i:i + config.MAX_PARALLEL_ATTRIBUTES] 
-                      for i in range(0, len(pdf_fallback_needed), config.MAX_PARALLEL_ATTRIBUTES)]
-        
-        logger.info(f"Split PDF processing into {len(pdf_batches)} batches")
-        
-        for batch_idx, batch in enumerate(pdf_batches):
-            logger.info(f"Processing PDF batch {batch_idx + 1}/{len(pdf_batches)}")
-            if check_health_check_timeout():
-                logger.error("Health check timeout reached during PDF processing")
-                break
-                
-            batch_prompts = {name: prompts_to_run[name] for name in batch}
-            batch_results = await process_attribute_batch(batch_prompts, pdf_chain, is_web=False)
-            
-            for prompt_name, result in batch_results.items():
-                if prompt_name in intermediate_results:
-                    intermediate_results[prompt_name].update({
-                        'Extracted Value': result,
-                        'Source': 'PDF'
-                    })
-                else:
-                    intermediate_results[prompt_name] = {
-                        'Prompt Name': prompt_name,
-                        'Extracted Value': result,
-                        'Source': 'PDF',
-                        'Latency (s)': 0.0
-                    }
-    
-    logger.info("Attribute processing pipeline completed")
-    return intermediate_results
-
-# Update the main processing section to use the new parallel processing
-async def process_attributes_main():
-    """Main function for processing attributes."""
-    logger.info("Starting attribute processing...")
-    
-    try:
-        # Get the current part number
-        part_number = st.session_state.get("sidebar_part_number_input", "").strip()
-        logger.debug(f"Processing with part number: {part_number}")
-        
-        # Get the scraped table HTML if available
-        scraped_table_html = st.session_state.get("scraped_table_html_cache")
-        if scraped_table_html:
-            logger.debug("Using cached scraped table HTML")
-        else:
-            logger.debug("No cached scraped table HTML available")
-        
-        # Process all attributes
-        with st.spinner("Processing attributes..."):
-            try:
-                logger.info("Starting attribute extraction...")
-                intermediate_results = await process_all_attributes(
-                    prompts_to_run,
-                    st.session_state.web_chain,
-                    st.session_state.pdf_chain,
-                    scraped_table_html
-                )
-                
-                # Convert results to list and update session state
-                extraction_results_list = list(intermediate_results.values())
-                logger.info(f"Extraction complete. Generated {len(extraction_results_list)} results")
-                logger.debug(f"Result keys: {[r.get('Prompt Name') for r in extraction_results_list]}")
-                
-                st.session_state.evaluation_results = extraction_results_list
-                st.session_state.extraction_performed = True
-                
-                st.success("Extraction complete!")
-            except Exception as e:
-                logger.error(f"Error during attribute processing: {str(e)}", exc_info=True)
-                st.error("Error during processing. Please try again.")
-    except Exception as e:
-        logger.error(f"Error in process_attributes_main: {str(e)}", exc_info=True)
-        raise
-
-def main():
-    """Main function for the extraction app."""
-    try:
-        logger.info("Starting extraction app initialization...")
-        
-        # Initialize view state if not already done
-        if 'extraction_view_initialized' not in st.session_state:
-            st.session_state.extraction_view_initialized = False
-
-        if not st.session_state.extraction_view_initialized:
-            # Install Playwright browsers only if not already done
-            if 'playwright_installed' not in st.session_state:
-                logger.info("Installing Playwright browsers...")
-                install_playwright_browsers()
-                st.session_state.playwright_installed = True
-                logger.info("Playwright installation complete")
-
-            # Initialize LLM if not already in session state
-            if 'llm' not in st.session_state:
-                try:
-                    logger.info("Initializing LLM...")
-                    st.session_state.llm = initialize_llm_cached()
-                    if st.session_state.llm is None:
-                        raise Exception("LLM initialization returned None")
-                    logger.success("LLM initialized successfully")
-                except Exception as e:
-                    logger.error(f"Failed to initialize LLM: {e}", exc_info=True)
-                    st.error(f"Fatal Error: Could not initialize LLM. Error: {e}")
-                    st.stop()
-
-            # Initialize embeddings if not already in session state
-            if 'embedding_function' not in st.session_state:
-                try:
-                    logger.info("Initializing embeddings...")
-                    st.session_state.embedding_function = initialize_embeddings()
-                    if st.session_state.embedding_function is None:
-                        raise Exception("Embeddings initialization returned None")
-                    logger.success("Embeddings initialized successfully")
-                except Exception as e:
-                    logger.error(f"Failed to initialize embeddings: {e}", exc_info=True)
-                    st.error(f"Fatal Error: Could not initialize embeddings. Error: {e}")
-                    st.stop()
-
-            # Set up the main UI
-            st.title("Document Extraction")
-            st.markdown("Upload your documents or enter a part number to extract information.")
-            st.session_state.extraction_view_initialized = True
-
-        # File upload section
-        uploaded_files = st.file_uploader("Upload PDF files", type=['pdf'], accept_multiple_files=True)
-        if uploaded_files:
-            logger.info(f"Files uploaded: {[f.name for f in uploaded_files]}")
-        
-        # Part number input
-        part_number = st.text_input("Enter Part Number (optional)", key="main_part_number_input", value=st.session_state.get("main_part_number_input", ""))
-# Use 'part_number' directly in your logic, do not set st.session_state.part_number_input again
-
-        # Process button
-        if st.button("Process Documents"):
-            if uploaded_files or part_number:
-                logger.info("Processing documents...")
-                logger.debug(f"Number of files to process: {len(uploaded_files) if uploaded_files else 0}")
-                logger.debug(f"Part number provided: {part_number if part_number else 'None'}")
-                
-                # Verify LLM is initialized
-                if not st.session_state.get('llm'):
-                    logger.error("LLM not initialized")
-                    st.error("LLM not initialized. Please refresh the page and try again.")
-                    return
-
-                # Initialize retriever if not already in session state
-                if 'retriever' not in st.session_state:
-                    try:
-                        logger.info("Initializing retriever...")
-                        st.session_state.retriever = load_existing_vector_store(st.session_state.embedding_function)
-                        if st.session_state.retriever:
-                            logger.success("Retriever initialized successfully")
-                        else:
-                            logger.warning("No existing retriever found, will be created after document processing")
-                    except Exception as e:
-                        logger.error(f"Failed to initialize retriever: {e}", exc_info=True)
-                        st.error("Failed to initialize retriever")
-                        return
-
-                # Check if chains are initialized
-                if not st.session_state.pdf_chain and st.session_state.retriever:
-                    logger.info("PDF chain not initialized, creating now...")
-                    try:
-                        st.session_state.pdf_chain = create_pdf_extraction_chain(st.session_state.retriever, st.session_state.llm)
-                        if st.session_state.pdf_chain is None:
-                            raise Exception("PDF chain creation returned None")
-                        logger.info("PDF chain created successfully")
-                    except Exception as e:
-                        logger.error(f"Failed to create PDF chain: {e}", exc_info=True)
-                        st.error("Failed to initialize PDF processing chain")
-                        return
-
-                if not st.session_state.web_chain:
-                    logger.info("Web chain not initialized, creating now...")
-                    try:
-                        st.session_state.web_chain = create_web_extraction_chain(st.session_state.llm)
-                        if st.session_state.web_chain is None:
-                            raise Exception("Web chain creation returned None")
-                        logger.info("Web chain created successfully")
-                    except Exception as e:
-                        logger.error(f"Failed to create web chain: {e}", exc_info=True)
-                        st.error("Failed to initialize web processing chain")
-                        return
-
-                # Verify chains are properly initialized
-                if not st.session_state.pdf_chain or not st.session_state.web_chain:
-                    logger.error("One or more chains not properly initialized")
-                    st.error("Processing chains not properly initialized. Please refresh the page and try again.")
-                    return
-
-                # Call the async function if needed
-                if not st.session_state.extraction_performed:
-                    logger.info("Starting async processing...")
-                    try:
-                        # Get the current event loop or create a new one
-                        try:
-                            loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-
-                        # Run the async processing
-                        if loop.is_running():
-                            # If loop is running, create a new task
-                            loop.create_task(process_attributes_main())
-                        else:
-                            # If loop is not running, run it
-                            loop.run_until_complete(process_attributes_main())
-                        logger.info("Async processing complete")
-                    except Exception as e:
-                        logger.error(f"Error during async processing: {str(e)}", exc_info=True)
-                        st.error(f"Error during processing: {str(e)}")
-                else:
-                    logger.info("Extraction already performed, skipping processing")
-            else:
-                logger.warning("No files or part number provided for processing")
-                st.warning("Please upload files or enter a part number to process.")
-
-        # Display results if available
-        if st.session_state.evaluation_results:
-            logger.info("Displaying extraction results")
-            logger.debug(f"Number of results: {len(st.session_state.evaluation_results)}")
-            st.subheader("Extraction Results")
-            results_df = pd.DataFrame(st.session_state.evaluation_results)
-            st.dataframe(results_df)
-            
-    except Exception as e:
-        logger.error(f"Error in extraction app: {str(e)}", exc_info=True)
-        st.error(f"Error in extraction app: {str(e)}")
-        st.write("Debug: Full error details:", e.__class__.__name__)
-        import traceback
-        st.write("Debug: Traceback:", traceback.format_exc())
-
-# Make sure the main function is properly exported
-__all__ = ['main']
-
-# Only run main() if this file is being run directly
-# if __name__ == "__main__":
-#     main()
