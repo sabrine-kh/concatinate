@@ -10,18 +10,14 @@ import time
 from loguru import logger
 import json
 import pandas as pd
-import re
 import asyncio
 import subprocess
 import nest_asyncio
-from streamlit.runtime.scriptrunner import add_script_run_ctx
 from typing import List
-from langchain.docstore.document import Document
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 
 nest_asyncio.apply()
 
+# --- UI Setup ---
 st.markdown(
     """<style>
     [data-testid='stSidebarNav'] {display: none;}
@@ -29,6 +25,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# --- Navigation Sidebar ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
     if st.button("🏠 Home"):
@@ -38,7 +35,9 @@ with st.sidebar:
     if st.button("📄 Extract a new Part"):
         st.switch_page("pages/extraction_attributs.py")
 
+# --- Playwright Browser Installation ---
 def install_playwright_browsers():
+    """Install Playwright browsers if needed."""
     logger.info("Checking and installing Playwright browsers if needed...")
     try:
         process = subprocess.run([sys.executable, "-m", "playwright", "install"], 
@@ -60,12 +59,12 @@ if 'playwright_installed' not in st.session_state:
     install_playwright_browsers()
     st.session_state.playwright_installed = True
 
+# --- Imports ---
 import config
-from pdf_processor import process_uploaded_pdfs, process_pdfs_in_background
+from pdf_processor import process_uploaded_pdfs
 from vector_store import (
     get_embedding_function,
-    setup_vector_store,
-    load_existing_vector_store
+    setup_vector_store
 )
 from llm_interface import (
     initialize_llm,
@@ -108,7 +107,7 @@ from extraction_prompts import (
     # Specialized Attributes
     HV_QUALIFIED_PROMPT
 )
-# Import the NEW web prompts
+# Import the web prompts
 from extraction_prompts_web import (
     # Material Properties
     MATERIAL_FILLING_WEB_PROMPT,
@@ -144,60 +143,7 @@ from extraction_prompts_web import (
     HV_QUALIFIED_WEB_PROMPT
 )
 
-# Define prompts at the module level
-MATERIAL_PROMPT = "Extract the material filling information from the document."
-MATERIAL_FILLING_WEB_PROMPT = "Extract the material filling information from the web data."
-MATERIAL_NAME_PROMPT = "Extract the material name from the document."
-MATERIAL_NAME_WEB_PROMPT = "Extract the material name from the web data."
-PULL_TO_SEAT_PROMPT = "Extract the pull-to-seat value from the document."
-PULL_TO_SEAT_WEB_PROMPT = "Extract the pull-to-seat value from the web data."
-GENDER_PROMPT = "Extract the gender information from the document."
-GENDER_WEB_PROMPT = "Extract the gender information from the web data."
-HEIGHT_MM_PROMPT = "Extract the height in millimeters from the document."
-HEIGHT_MM_WEB_PROMPT = "Extract the height in millimeters from the web data."
-LENGTH_MM_PROMPT = "Extract the length in millimeters from the document."
-LENGTH_MM_WEB_PROMPT = "Extract the length in millimeters from the web data."
-WIDTH_MM_PROMPT = "Extract the width in millimeters from the document."
-WIDTH_MM_WEB_PROMPT = "Extract the width in millimeters from the web data."
-NUMBER_OF_CAVITIES_PROMPT = "Extract the number of cavities from the document."
-NUMBER_OF_CAVITIES_WEB_PROMPT = "Extract the number of cavities from the web data."
-NUMBER_OF_ROWS_PROMPT = "Extract the number of rows from the document."
-NUMBER_OF_ROWS_WEB_PROMPT = "Extract the number of rows from the web data."
-MECHANICAL_CODING_PROMPT = "Extract the mechanical coding from the document."
-MECHANICAL_CODING_WEB_PROMPT = "Extract the mechanical coding from the web data."
-COLOUR_PROMPT = "Extract the colour information from the document."
-COLOUR_WEB_PROMPT = "Extract the colour information from the web data."
-COLOUR_CODING_PROMPT = "Extract the colour coding from the document."
-COLOUR_CODING_WEB_PROMPT = "Extract the colour coding from the web data."
-WORKING_TEMPERATURE_PROMPT = "Extract the working temperature range from the document."
-MAX_WORKING_TEMPERATURE_WEB_PROMPT = "Extract the maximum working temperature from the web data."
-MIN_WORKING_TEMPERATURE_WEB_PROMPT = "Extract the minimum working temperature from the web data."
-HOUSING_SEAL_PROMPT = "Extract the housing seal information from the document."
-HOUSING_SEAL_WEB_PROMPT = "Extract the housing seal information from the web data."
-WIRE_SEAL_PROMPT = "Extract the wire seal information from the document."
-WIRE_SEAL_WEB_PROMPT = "Extract the wire seal information from the web data."
-SEALING_PROMPT = "Extract the sealing information from the document."
-SEALING_WEB_PROMPT = "Extract the sealing information from the web data."
-SEALING_CLASS_PROMPT = "Extract the sealing class from the document."
-SEALING_CLASS_WEB_PROMPT = "Extract the sealing class from the web data."
-CONTACT_SYSTEMS_PROMPT = "Extract the contact systems information from the document."
-CONTACT_SYSTEMS_WEB_PROMPT = "Extract the contact systems information from the web data."
-TERMINAL_POSITION_ASSURANCE_PROMPT = "Extract the terminal position assurance information from the document."
-TERMINAL_POSITION_ASSURANCE_WEB_PROMPT = "Extract the terminal position assurance information from the web data."
-CONNECTOR_POSITION_ASSURANCE_PROMPT = "Extract the connector position assurance information from the document."
-CONNECTOR_POSITION_ASSURANCE_WEB_PROMPT = "Extract the connector position assurance information from the web data."
-CLOSED_CAVITIES_PROMPT = "Extract the closed cavities information from the document."
-CLOSED_CAVITIES_WEB_PROMPT = "Extract the closed cavities information from the web data."
-PRE_ASSEMBLED_PROMPT = "Extract the pre-assembled information from the document."
-PRE_ASSEMBLED_WEB_PROMPT = "Extract the pre-assembled information from the web data."
-CONNECTOR_TYPE_PROMPT = "Extract the type of connector from the document."
-CONNECTOR_TYPE_WEB_PROMPT = "Extract the type of connector from the web data."
-SET_KIT_PROMPT = "Extract the set/kit information from the document."
-SET_KIT_WEB_PROMPT = "Extract the set/kit information from the web data."
-HV_QUALIFIED_PROMPT = "Extract the HV qualified information from the document."
-HV_QUALIFIED_WEB_PROMPT = "Extract the HV qualified information from the web data."
-
-# Define the prompts dictionary at the module level
+# --- Define the prompts dictionary ---
 prompts_to_run = { 
     # Material Properties
     "Material Filling": {"pdf": MATERIAL_PROMPT, "web": MATERIAL_FILLING_WEB_PROMPT},
@@ -233,76 +179,25 @@ prompts_to_run = {
     "HV Qualified": {"pdf": HV_QUALIFIED_PROMPT, "web": HV_QUALIFIED_WEB_PROMPT}
 }
 
-# --- Install Playwright browsers needed by crawl4ai --- 
-# This should run on startup in the Streamlit Cloud environment
-def install_playwright_browsers():
-    logger.info("Checking and installing Playwright browsers if needed...")
-    try:
-        # Use subprocess to run the command
-        # stdout/stderr=subprocess.PIPE can capture output if needed
-        # check=True will raise an error if the command fails
-        process = subprocess.run([sys.executable, "-m", "playwright", "install"], 
-                                 capture_output=True, text=True, check=False) # Use check=False initially to see output
-        if process.returncode == 0:
-             logger.success("Playwright browsers installed successfully (or already exist).")
-        else:
-             # Log stdout/stderr for debugging if it failed
-             logger.error(f"Playwright browser install command failed with code {process.returncode}.")
-             logger.error(f"stdout: {process.stdout}")
-             logger.error(f"stderr: {process.stderr}")
-             # Optionally raise an error or show a Streamlit warning
-             # st.warning("Failed to install necessary Playwright browsers. Web scraping may fail.")
-        # Alternative using playwright's internal API (might be cleaner if stable)
-        # from playwright.driver import main as playwright_main
-        # playwright_main.main(['install']) # Installs default browser (chromium)
-        # logger.success("Playwright browsers installed successfully via internal API.")
-    except FileNotFoundError:
-        logger.error("Could not find 'playwright' command. Is playwright installed correctly?")
-        st.error("Playwright not found. Please ensure 'playwright' is in requirements.txt")
-    except Exception as e:
-        logger.error(f"An error occurred during Playwright browser installation: {e}", exc_info=True)
-        st.warning(f"An error occurred installing Playwright browsers: {e}. Web scraping may fail.")
-
-# --- Logging Configuration ---
-# Configure Loguru logger (can be more flexible than standard logging)
-# logger.add("logs/app_{time}.log", rotation="10 MB", level="INFO") # Example: Keep file logging if desired
-# Toasts are disabled as per previous request
-# Errors will still be shown via st.error where used explicitly
-
 # --- Application State ---
-# Use Streamlit's session state to hold persistent data across reruns
 if 'retriever' not in st.session_state:
     st.session_state.retriever = None
-# Add states for BOTH chains
 if 'pdf_chain' not in st.session_state:
     st.session_state.pdf_chain = None
 if 'web_chain' not in st.session_state:
     st.session_state.web_chain = None
-# Remove old single chain state
-# if 'extraction_chain' not in st.session_state:
-#     st.session_state.extraction_chain = None
 if 'processed_files' not in st.session_state:
-    st.session_state.processed_files = [] # Store names of processed files
-# Add state for evaluation
+    st.session_state.processed_files = []
 if 'evaluation_results' not in st.session_state:
-    st.session_state.evaluation_results = [] # List to store detailed results per field
+    st.session_state.evaluation_results = []
 if 'evaluation_metrics' not in st.session_state:
-    st.session_state.evaluation_metrics = None # Dict to store summary metrics
-# Add flag to track if extraction has run for the current data
+    st.session_state.evaluation_metrics = None
 if 'extraction_performed' not in st.session_state:
     st.session_state.extraction_performed = False
 if 'scraped_table_html_cache' not in st.session_state:
-    st.session_state.scraped_table_html_cache = None # Cache for scraped HTML for the current part number
+    st.session_state.scraped_table_html_cache = None
 if 'current_part_number_scraped' not in st.session_state:
-    st.session_state.current_part_number_scraped = None # Track which part number was last scraped for
-
-# Add new session state for background tasks
-if 'pdf_processing_task' not in st.session_state:
-    st.session_state.pdf_processing_task = None
-if 'pdf_processing_complete' not in st.session_state:
-    st.session_state.pdf_processing_complete = False
-if 'pdf_processing_results' not in st.session_state:
-    st.session_state.pdf_processing_results = None
+    st.session_state.current_part_number_scraped = None
 
 def reset_evaluation_state():
     """Reset all evaluation-related session state variables."""
@@ -313,69 +208,53 @@ def reset_evaluation_state():
     st.session_state.current_part_number_scraped = None
 
 # --- Global Variables / Initialization ---
-# Initialize embeddings (this is relatively heavy, do it once)
 @st.cache_resource
 def initialize_embeddings():
-    # Let exceptions from get_embedding_function propagate
+    """Initialize embeddings function."""
     embeddings = get_embedding_function()
     return embeddings
 
-# Initialize LLM (also potentially heavy/needs API key check)
 @st.cache_resource
 def initialize_llm_cached():
-    # logger.info("Attempting to initialize LLM...") # Log before calling if needed
+    """Initialize LLM function."""
     llm_instance = initialize_llm()
-    # logger.success("LLM initialized successfully.") # Log after successful call if needed
     return llm_instance
 
-# --- Wrap the cached function call in try-except ---
+# --- Initialize Core Components ---
 embedding_function = None
 llm = None
 
 try:
-    st.write("Debug: Initializing embedding function...")
     logger.info("Attempting to initialize embedding function...")
     embedding_function = initialize_embeddings()
     if embedding_function:
          logger.success("Embedding function initialized successfully.")
-         st.write("Debug: Embedding function initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize embeddings: {e}", exc_info=True)
     st.error(f"Fatal Error: Could not initialize embedding model. Error: {e}")
-    st.write("Debug: Embedding initialization failed:", str(e))
     st.stop()
 
 try:
-    st.write("Debug: Initializing LLM...")
     logger.info("Attempting to initialize LLM...")
     llm = initialize_llm_cached()
     if llm:
         logger.success("LLM initialized successfully.")
-        st.write("Debug: LLM initialized successfully")
 except Exception as e:
      logger.error(f"Failed to initialize LLM: {e}", exc_info=True)
      st.error(f"Fatal Error: Could not initialize LLM. Error: {e}")
-     st.write("Debug: LLM initialization failed:", str(e))
      st.stop()
 
-# --- Check if initializations failed ---
 if embedding_function is None or llm is None:
-     if not st.exception: # If st.stop() wasn't called already
-        st.error("Core components (Embeddings or LLM) failed to initialize. Cannot continue.")
-        st.write("Debug: Core components failed to initialize")
-     st.stop()
-
-
+    st.error("Core components (Embeddings or LLM) failed to initialize. Cannot continue.")
+    st.stop()
 
 # --- UI Layout ---
-st.title("📄 PDF Auto-Extraction with Groq") # Updated title
-st.markdown("Upload PDF documents, process them, and view automatically extracted information.") # Updated description
+st.title("📄 PDF Auto-Extraction with Groq")
+st.markdown("Upload PDF documents, process them, and view automatically extracted information.")
 st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}`")
 
-# Check for API Key (LLM init already does this, but maybe keep a visual warning)
 if not config.GROQ_API_KEY:
     st.warning("Groq API Key not found. Please set the GROQ_API_KEY environment variable.", icon="⚠️")
-
 
 # --- Sidebar for PDF Upload and Processing ---
 with st.sidebar:
@@ -502,42 +381,6 @@ else:
         # --- Get Part Number --- 
         part_number = st.session_state.get("part_number_input", "").strip()
         # ---------------------
-
-        # Define the prompts (attribute keys mapped to PDF and WEB instructions)
-        prompts_to_run = { 
-            # Material Properties
-            "Material Filling": {"pdf": MATERIAL_PROMPT, "web": MATERIAL_FILLING_WEB_PROMPT},
-            "Material Name": {"pdf": MATERIAL_NAME_PROMPT, "web": MATERIAL_NAME_WEB_PROMPT},
-            # Physical / Mechanical Attributes
-            "Pull-to-Seat": {"pdf": PULL_TO_SEAT_PROMPT, "web": PULL_TO_SEAT_WEB_PROMPT},
-            "Gender": {"pdf": GENDER_PROMPT, "web": GENDER_WEB_PROMPT},
-            "Height [MM]": {"pdf": HEIGHT_MM_PROMPT, "web": HEIGHT_MM_WEB_PROMPT},
-            "Length [MM]": {"pdf": LENGTH_MM_PROMPT, "web": LENGTH_MM_WEB_PROMPT},
-            "Width [MM]": {"pdf": WIDTH_MM_PROMPT, "web": WIDTH_MM_WEB_PROMPT},
-            "Number of Cavities": {"pdf": NUMBER_OF_CAVITIES_PROMPT, "web": NUMBER_OF_CAVITIES_WEB_PROMPT},
-            "Number of Rows": {"pdf": NUMBER_OF_ROWS_PROMPT, "web": NUMBER_OF_ROWS_WEB_PROMPT},
-            "Mechanical Coding": {"pdf": MECHANICAL_CODING_PROMPT, "web": MECHANICAL_CODING_WEB_PROMPT},
-            "Colour": {"pdf": COLOUR_PROMPT, "web": COLOUR_WEB_PROMPT},
-            "Colour Coding": {"pdf": COLOUR_CODING_PROMPT, "web": COLOUR_CODING_WEB_PROMPT},
-            # Sealing & Environmental
-            "Max. Working Temperature [°C]": {"pdf": WORKING_TEMPERATURE_PROMPT, "web": MAX_WORKING_TEMPERATURE_WEB_PROMPT},
-            "Min. Working Temperature [°C]": {"pdf": WORKING_TEMPERATURE_PROMPT, "web": MIN_WORKING_TEMPERATURE_WEB_PROMPT},
-            "Housing Seal": {"pdf": HOUSING_SEAL_PROMPT, "web": HOUSING_SEAL_WEB_PROMPT},
-            "Wire Seal": {"pdf": WIRE_SEAL_PROMPT, "web": WIRE_SEAL_WEB_PROMPT},
-            "Sealing": {"pdf": SEALING_PROMPT, "web": SEALING_WEB_PROMPT},
-            "Sealing Class": {"pdf": SEALING_CLASS_PROMPT, "web": SEALING_CLASS_WEB_PROMPT},
-            # Terminals & Connections
-            "Contact Systems": {"pdf": CONTACT_SYSTEMS_PROMPT, "web": CONTACT_SYSTEMS_WEB_PROMPT},
-            "Terminal Position Assurance": {"pdf": TERMINAL_POSITION_ASSURANCE_PROMPT, "web": TERMINAL_POSITION_ASSURANCE_WEB_PROMPT},
-            "Connector Position Assurance": {"pdf": CONNECTOR_POSITION_ASSURANCE_PROMPT, "web": CONNECTOR_POSITION_ASSURANCE_WEB_PROMPT},
-            "Closed Cavities": {"pdf": CLOSED_CAVITIES_PROMPT, "web": CLOSED_CAVITIES_WEB_PROMPT},
-            # Assembly & Type
-            "Pre-Assembled": {"pdf": PRE_ASSEMBLED_PROMPT, "web": PRE_ASSEMBLED_WEB_PROMPT},
-            "Type of Connector": {"pdf": CONNECTOR_TYPE_PROMPT, "web": CONNECTOR_TYPE_WEB_PROMPT},
-            "Set/Kit": {"pdf": SET_KIT_PROMPT, "web": SET_KIT_WEB_PROMPT},
-            # Specialized Attributes
-            "HV Qualified": {"pdf": HV_QUALIFIED_PROMPT, "web": HV_QUALIFIED_WEB_PROMPT}
-        }
 
         # --- Block 1a: Scrape Web Table HTML (if needed) --- 
         scraped_table_html = None # Initialize
