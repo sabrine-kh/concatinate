@@ -17,7 +17,7 @@ LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen/qwen3-32b") # Reverted to a k
 # GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions" # Needed if using raw requests
 
 # --- Vision Model Configuration ---
-VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "mistral-")
+VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "mistral-small-latest")
 
 # --- Embedding Configuration ---
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
