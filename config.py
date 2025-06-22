@@ -16,6 +16,9 @@ LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen-qwq-32b") # Reverted to a kno
 # LLM_MODEL_NAME = "qwen-qwq-32b" # Your original choice via requests
 # GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions" # Needed if using raw requests
 
+# --- Vision Model Configuration ---
+VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "mistral-medium")
+
 # --- Embedding Configuration ---
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
 EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu") # Add this line ('cpu' is default, 'cuda' if GPU available and configured)
