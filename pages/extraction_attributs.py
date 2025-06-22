@@ -283,5 +283,21 @@ def main():
         st.info("Upload and process documents using the sidebar to see extracted results here.")
         return
 
+    # --- Exemple d'extraction d'attribut (MATERIAL_NAME) ---
+    if st.session_state.pdf_chain:
+        extraction_input = {
+            "attribute_key": "MATERIAL NAME",
+            "extraction_instructions": {"extraction_instructions": MATERIAL_NAME_PROMPT},
+            "part_number": {"part_number": st.session_state.get("part_number_input", "")}
+        }
+        result = asyncio.run(_invoke_chain_and_process(st.session_state.pdf_chain, extraction_input, "MATERIAL NAME"))
+        st.session_state.evaluation_results = [result]
+
+    # --- Affichage du résultat ---
+    if st.session_state.evaluation_results:
+        st.subheader("Résultat d'extraction (exemple) :")
+        for res in st.session_state.evaluation_results:
+            st.write(res)
+
 if __name__ == "__main__":
     main() 
