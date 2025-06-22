@@ -24,6 +24,7 @@ import asyncio # Add asyncio import
 import subprocess # To run playwright install
 import nest_asyncio # Add nest_asyncio for better async handling
 from streamlit.runtime.scriptrunner import add_script_run_ctx
+import streamlit as st
 
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
