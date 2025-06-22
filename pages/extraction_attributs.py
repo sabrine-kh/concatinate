@@ -463,10 +463,6 @@ with st.sidebar:
     # Check if both chains are ready for the full process
     if st.session_state.pdf_chain and st.session_state.web_chain and st.session_state.processed_files:
         st.success(f"Ready. Processed: {', '.join(st.session_state.processed_files)}")
-    elif persistence_enabled and st.session_state.retriever and (not st.session_state.pdf_chain or not st.session_state.web_chain):
-         st.warning("Loaded existing data, but failed to create one or both extraction chains.")
-    elif persistence_enabled and st.session_state.retriever:
-         st.success(f"Ready. Using existing data loaded from disk.") # Assuming chains created on load
     else:
         st.info("Upload and process PDF documents to view extracted data.")
 
