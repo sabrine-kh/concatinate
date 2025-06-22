@@ -235,7 +235,7 @@ def main():
                     try:
                         start_time = time.time()
                         temp_dir = os.path.join(os.getcwd(), "temp_pdf_files")
-                        processed_docs = process_uploaded_pdfs(uploaded_files, temp_dir)
+                        processed_docs = asyncio.run(process_uploaded_pdfs(uploaded_files, temp_dir))
                         processing_time = time.time() - start_time
                         logger.info(f"PDF processing took {processing_time:.2f} seconds.")
                     except Exception as e:
