@@ -184,14 +184,13 @@ def main():
         unsafe_allow_html=True
     )
 
-    # Sidebar navigation only
     with st.sidebar:
         st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
-        if st.button("🏠 Home", key="nav_home"):
+        if st.button("🏠 Home"):
             st.switch_page("app.py")
-        if st.button("💬 Chat with Leoparts", key="nav_chat"):
+        if st.button("�� Chat with Leoparts"):
             st.switch_page("pages/chatbot.py")
-        if st.button("📄 Extract a new Part", key="nav_extract"):
+        if st.button("📄 Extract a new Part"):
             st.switch_page("pages/extraction_attributs.py")
 
     # Main welcome content

@@ -25,6 +25,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+with st.sidebar:
+    st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
+    if st.button("🏠 Home"):
+        st.switch_page("app.py")
+    if st.button("💬 Chat with Leoparts"):
+        st.switch_page("pages/chatbot.py")
+    if st.button("📄 Extract a new Part"):
+        st.switch_page("pages/extraction_attributs.py")
+
 def install_playwright_browsers():
     logger.info("Checking and installing Playwright browsers if needed...")
     try:
