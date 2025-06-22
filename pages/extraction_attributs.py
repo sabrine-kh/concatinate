@@ -391,7 +391,7 @@ if st.session_state.retriever is None and config.CHROMA_SETTINGS.is_persistent a
 persistence_enabled = config.CHROMA_SETTINGS.is_persistent
 st.title("📄 PDF Auto-Extraction with Groq") # Updated title
 st.markdown("Upload PDF documents, process them, and view automatically extracted information.") # Updated description
-st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}` | **Persistence:** `{'Enabled' if persistence_enabled else 'Disabled'}`")
+st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}`")
 
 # Check for API Key (LLM init already does this, but maybe keep a visual warning)
 if not config.GROQ_API_KEY:
