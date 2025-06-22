@@ -365,27 +365,7 @@ if embedding_function is None or llm is None:
         st.write("Debug: Core components failed to initialize")
      st.stop()
 
-# Try loading existing vector store and create BOTH extraction chains
-if st.session_state.retriever is None and config.CHROMA_SETTINGS.is_persistent and embedding_function:
-    st.write("Debug: Loading existing vector store...")
-    logger.info("Attempting to load existing vector store...")
-    st.session_state.retriever = load_existing_vector_store(embedding_function)
-    if st.session_state.retriever:
-        logger.success("Successfully loaded retriever from persistent storage.")
-        st.write("Debug: Vector store loaded successfully")
-        st.session_state.processed_files = ["Existing data loaded from disk"]
-        # --- Create BOTH Extraction Chains --- 
-        st.write("Debug: Creating extraction chains...")
-        logger.info("Creating extraction chains from loaded retriever...")
-        st.session_state.pdf_chain = create_pdf_extraction_chain(st.session_state.retriever, llm)
-        st.session_state.web_chain = create_web_extraction_chain(llm)
-        if not st.session_state.pdf_chain or not st.session_state.web_chain:
-            st.write("Debug: Chain creation failed")
-            st.error("Failed to create extraction chains")
-        else:
-            st.write("Debug: Chains created successfully")
-    else:
-        logger.warning("No existing persistent vector store found or failed to load.")
+
 
 # --- UI Layout ---
 st.title("📄 PDF Auto-Extraction with Groq") # Updated title
