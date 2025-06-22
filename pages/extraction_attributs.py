@@ -388,7 +388,7 @@ with st.sidebar:
     )
 
     # --- Add Part Number Input ---
-    st.text_input("Enter Part Number (Optional):", key="part_number_input", value=st.session_state.get("part_number_input", ""))
+    st.text_input("Enter Part Number (Optional):", key="sidebar_part_number_input", value=st.session_state.get("sidebar_part_number_input", ""))
     # ---------------------------
 
     process_button = st.button("Process Uploaded Documents", key="process_button", type="primary")
@@ -433,9 +433,9 @@ with st.sidebar:
                         
                         # Start web processing if part number is provided
                         web_task = None
-                        if st.session_state.get("part_number_input"):
+                        if st.session_state.get("sidebar_part_number_input"):
                             web_task = asyncio.create_task(
-                                process_web_urls([st.session_state.get("part_number_input")])
+                                process_web_urls([st.session_state.get("sidebar_part_number_input")])
                             )
                         
                         # Wait for both tasks to complete
@@ -533,7 +533,7 @@ else:
     # --- Block 1: Run Extraction (if needed) --- 
     if (st.session_state.pdf_chain and st.session_state.web_chain) and not st.session_state.extraction_performed:
         # --- Get Part Number --- 
-        part_number = st.session_state.get("part_number_input", "").strip()
+        part_number = st.session_state.get("sidebar_part_number_input", "").strip()
         # ---------------------
 
         # Define the prompts (attribute keys mapped to PDF and WEB instructions)
@@ -1212,7 +1212,7 @@ async def process_attribute_batch(attributes_batch, chain, is_web=False):
         input_data = {
             "cleaned_web_data" if is_web else "extraction_instructions": instruction,
             "attribute_key": attribute_key,
-            "part_number": st.session_state.get("part_number_input", "Not Provided")
+            "part_number": st.session_state.get("sidebar_part_number_input", "Not Provided")
         }
         
         task = asyncio.create_task(
@@ -1328,7 +1328,7 @@ async def process_attributes_main():
     
     try:
         # Get the current part number
-        part_number = st.session_state.get("part_number_input", "").strip()
+        part_number = st.session_state.get("sidebar_part_number_input", "").strip()
         logger.debug(f"Processing with part number: {part_number}")
         
         # Get the scraped table HTML if available
@@ -1419,7 +1419,7 @@ def main():
             logger.info(f"Files uploaded: {[f.name for f in uploaded_files]}")
         
         # Part number input
-        part_number = st.text_input("Enter Part Number (optional)", key="part_number_input", value=st.session_state.get("part_number_input", ""))
+        part_number = st.text_input("Enter Part Number (optional)", key="main_part_number_input", value=st.session_state.get("main_part_number_input", ""))
 # Use 'part_number' directly in your logic, do not set st.session_state.part_number_input again
 
         # Process button
