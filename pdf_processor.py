@@ -9,7 +9,7 @@ from typing import List, BinaryIO, Optional, Dict, Any, Tuple
 from loguru import logger
 from PIL import Image
 import fitz  # PyMuPDF
-from mistralai import Mistral
+from mistralai.client import MistralClient
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -36,7 +36,7 @@ def encode_pil_image(pil_image: Image.Image, format: str = "PNG") -> Tuple[str, 
     img_byte = buffered.getvalue()
     return base64.b64encode(img_byte).decode('utf-8'), save_format.lower()
 
-async def process_single_pdf(file_path: str, file_basename: str, client: Mistral, model_name: str, 
+async def process_single_pdf(file_path: str, file_basename: str, client: MistralClient, model_name: str, 
                            text_splitter: RecursiveCharacterTextSplitter) -> List[Document]:
     """Process a single PDF file and return its documents."""
     all_docs = []
@@ -199,7 +199,7 @@ async def process_uploaded_pdfs(uploaded_files: List[BinaryIO], temp_dir: str = 
     
     # Initialize Mistral client
     try:
-        client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+        client = MistralClient(api_key=os.getenv("MISTRAL_API_KEY"))
         model_name = config.VISION_MODEL_NAME
         logger.info(f"Initialized Mistral Vision client with model: {model_name}")
     except Exception as e:
