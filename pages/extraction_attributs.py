@@ -15,6 +15,10 @@ import asyncio
 import subprocess
 import nest_asyncio
 from streamlit.runtime.scriptrunner import add_script_run_ctx
+from typing import List
+from langchain.docstore.document import Document
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 nest_asyncio.apply()
 
@@ -57,7 +61,7 @@ if 'playwright_installed' not in st.session_state:
     st.session_state.playwright_installed = True
 
 import config
-from pdf_processor import process_uploaded_pdfs
+from pdf_processor import process_uploaded_pdfs, process_pdfs_in_background
 from vector_store import (
     get_embedding_function,
     setup_vector_store,
