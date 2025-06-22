@@ -1419,10 +1419,8 @@ def main():
             logger.info(f"Files uploaded: {[f.name for f in uploaded_files]}")
         
         # Part number input
-        part_number = st.text_input("Enter Part Number (optional)")
-        if part_number:
-            logger.info(f"Part number entered: {part_number}")
-            st.session_state.part_number_input = part_number
+        part_number = st.text_input("Enter Part Number (optional)", key="part_number_input", value=st.session_state.get("part_number_input", ""))
+# Use 'part_number' directly in your logic, do not set st.session_state.part_number_input again
 
         # Process button
         if st.button("Process Documents"):
