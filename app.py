@@ -7,6 +7,7 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 # app.py
 import streamlit as st
+st.set_option('server.maxUploadSize', 200)  # 200 MB upload limit
 
 # Remove the page config since it's handled by main.py
 # st.set_page_config(
@@ -188,7 +189,7 @@ def main():
         st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
         if st.button("🏠 Home"):
             st.switch_page("app.py")
-        if st.button("�� Chat with Leoparts"):
+        if st.button("🤖 Chat with Leoparts"):
             st.switch_page("pages/chatbot.py")
         if st.button("📄 Extract a new Part"):
             st.switch_page("pages/extraction_attributs.py")
