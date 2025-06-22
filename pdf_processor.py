@@ -108,7 +108,7 @@ Output only the generated Markdown content.
                 # Call Mistral Vision API
                 logger.info("Sending page to Mistral Vision API...")
                 try:
-                    chat_response = client.chat.complete(
+                    chat_response = client.chat(
                         model=model_name,
                         messages=messages
                     )
