@@ -176,6 +176,14 @@ def main():
     # --- Nouvelle page d'accueil stylisée ---
     st.set_page_config(page_title="LEOPARTS", page_icon="🦁", layout="wide")
 
+    # Masquer le menu automatique Streamlit dans la sidebar
+    st.markdown(
+        """<style>
+        [data-testid="stSidebarNav"] {display: none;}
+        </style>""",
+        unsafe_allow_html=True
+    )
+
     # Sidebar navigation only
     with st.sidebar:
         st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
