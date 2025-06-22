@@ -409,19 +409,30 @@ with st.sidebar:
             logger.info(f"Starting processing for {len(filenames)} files: {', '.join(filenames)}")
             # --- PDF Processing ---
             with st.spinner("Processing PDFs... Loading, cleaning, splitting..."):
-                processed_docs = None # Initialize
+                processed_docs = [] # Initialize as empty list instead of None
                 try:
                     start_time = time.time()
                     temp_dir = os.path.join(os.getcwd(), "temp_pdf_files")
-                    processed_docs = process_uploaded_pdfs(uploaded_files, temp_dir)
+                    
+                    # Create event loop for async processing
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    # Call the async function properly
+                    processed_docs = loop.run_until_complete(process_uploaded_pdfs(uploaded_files, temp_dir))
+                    
                     processing_time = time.time() - start_time
                     logger.info(f"PDF processing took {processing_time:.2f} seconds.")
                 except Exception as e:
                     logger.error(f"Failed during PDF processing phase: {e}", exc_info=True)
                     st.error(f"Error processing PDFs: {e}")
+                    processed_docs = [] # Ensure it's an empty list on error
 
             # --- Vector Store Indexing ---
-            if processed_docs:
+            if processed_docs and len(processed_docs) > 0:
                 logger.info(f"Generated {len(processed_docs)} document chunks.")
                 with st.spinner("Indexing documents in vector store..."):
                     try:
