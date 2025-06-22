@@ -275,6 +275,10 @@ def main():
     else:
         st.info("Upload and process PDF documents to view extracted data.")
     st.header("2. Extracted Information")
+    st.write("DEBUG - processed_files:", st.session_state.get('processed_files'))
+    st.write("DEBUG - pdf_chain:", st.session_state.get('pdf_chain'))
+    st.write("DEBUG - web_chain:", st.session_state.get('web_chain'))
+    st.write("DEBUG - evaluation_results:", st.session_state.get('evaluation_results'))
     if not st.session_state.pdf_chain or not st.session_state.web_chain:
         st.info("Upload and process documents using the sidebar to see extracted results here.")
         return
