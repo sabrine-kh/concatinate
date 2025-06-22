@@ -36,6 +36,13 @@ def process_uploaded_pdfs(uploaded_files: List[BinaryIO], temp_dir: str = "temp_
     
     try:
         for uploaded_file in uploaded_files:
+            print("Nom du fichier reçu:", uploaded_file.name)
+            try:
+                file_content = uploaded_file.getvalue()
+                print("Taille du fichier (octets):", len(file_content))
+            except Exception as e:
+                print("Erreur lors de la lecture du fichier:", e)
+                continue
             file_basename = uploaded_file.name
             file_path = os.path.join(temp_dir, file_basename)
             saved_file_paths.append(file_path)
