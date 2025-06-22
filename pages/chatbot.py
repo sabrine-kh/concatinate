@@ -38,7 +38,7 @@ with st.sidebar:
 
 # Add navigation button at the top
 if st.sidebar.button("← Back to Main App", use_container_width=True):
-    st.switch_page("../app.py")
+    st.switch_page("app.py")
 
 # --- Configuration ---
 try:
