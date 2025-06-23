@@ -111,43 +111,6 @@ def strip_think_tags(text: str) -> str:
 # ───────────────────────────────────────────────────────────────────────────
 # Existing helper functions
 # ───────────────────────────────────────────────────────────────────────────
-def _normalise_chunk(row):
-    """
-    Ensure each markdown chunk is a plain dict with at least a 'content' key.
-    Handles four cases:
-      1. Already the desired dict               → return as-is
-      2. Wrapper   {'data': {...}}              → unwrap
-      3. JSON/text '{"filename":...}'           → json.loads / ast.literal_eval
-      4. Bare string 'Some paragraph …'         → wrap in {'content': ...}
-    """
-    # case 1
-    if isinstance(row, dict) and "content" in row:
-        return row
-
-    # case 2 – single-key wrapper
-    if isinstance(row, dict) and len(row) == 1:
-        row = next(iter(row.values()))
-
-    # case 3 – JSON string
-    if isinstance(row, str):
-        try:
-            row = json.loads(row)
-        except json.JSONDecodeError:
-            try:
-                row = ast.literal_eval(row)
-            except Exception:
-                # case 4 – treat as plain text
-                return {"content": row, "filename": "Unknown", "similarity": None}
-
-    # final guard
-    if isinstance(row, dict):
-        row.setdefault("filename", "Unknown")
-        row.setdefault("similarity", None)
-        return row
-
-    # give up: return minimal stub so formatter won't crash
-    return {"content": str(row), "filename": "Unknown", "similarity": None}
-
 def get_query_embedding(text):
     if not text:
         return None
@@ -157,21 +120,31 @@ def get_query_embedding(text):
         st.error(f"    Error generating query embedding: {e}")
         return None
 
-def find_relevant_markdown_chunks(query_embedding):
-    if not query_embedding:
+def find_relevant_attributes_with_sql(generated_sql: str):
+    """
+    Executes the LLM-generated SELECT via execute_readonly_sql().
+    Always returns List[dict] rows.
+    """
+    if not generated_sql:
         return []
 
-    resp = supabase.rpc(
-        RPC_FUNCTION_NAME,
-        {
-            'query_embedding': query_embedding,
-            'match_threshold': VECTOR_SIMILARITY_THRESHOLD,
-            'match_count': VECTOR_MATCH_COUNT
-        }
-    ).execute()
+    sql_to_run = generated_sql.rstrip().rstrip(';')
+    try:
+        res = supabase.rpc("execute_readonly_sql", {"q": sql_to_run}).execute()
 
-    raw_rows = resp.data or []
-    return [_normalise_chunk(r) for r in raw_rows]
+        if not res.data:
+            return []
+
+        # If each element is already a dict, just return the list as-is
+        if isinstance(res.data[0], dict):
+            return res.data
+
+        # Otherwise grab the single JSON column
+        first_key = next(iter(res.data[0].keys()))
+        return [_to_dict(row[first_key]) for row in res.data]
+
+    except Exception as e:
+        return []
 
 # ───────────────────────────────────────────────────────────────────────────
 #  TEXT-TO-SQL GENERATION
@@ -291,50 +264,13 @@ def _to_dict(maybe_json):
     # Give up – return an empty dict to avoid crashing format_context
     return {}
 
-def find_relevant_attributes_with_sql(generated_sql: str):
-    """
-    Executes the LLM-generated SELECT via execute_readonly_sql().
-    Always returns List[dict] rows.
-    """
-    if not generated_sql:
-        return []
-
-    sql_to_run = generated_sql.rstrip().rstrip(';')
-    try:
-        res = supabase.rpc("execute_readonly_sql", {"q": sql_to_run}).execute()
-
-        if not res.data:
-            return []
-
-        # If each element is already a dict, just return the list as-is
-        if isinstance(res.data[0], dict):
-            return res.data
-
-        # Otherwise grab the single JSON column
-        first_key = next(iter(res.data[0].keys()))
-        return [_to_dict(row[first_key]) for row in res.data]
-
-    except Exception as e:
-        return []
-
 # ───────────────────────────────────────────────────────────────────────────
 #  CONTEXT FORMATTING
 # ───────────────────────────────────────────────────────────────────────────
-def format_context(markdown_chunks, attribute_rows):
+def format_context(attribute_rows):
     context_str = ""
-    md_present = bool(markdown_chunks)
     attr_present = bool(attribute_rows)
-    if md_present:
-        context_str += "Context from LEOparts Standards Document:\n\n"
-        for i, chunk in enumerate(markdown_chunks):
-            filename = chunk.get('filename', 'Unknown Source')
-            content = chunk.get('content', 'Content unavailable')
-            similarity = chunk.get('similarity', None)
-            context_str += f"--- Document Chunk {i+1} (Source: {filename}"
-            if similarity is not None: context_str += f" | Similarity: {similarity:.4f}"
-            context_str += ") ---\n" + content + "\n---\n\n"
     if attr_present:
-        if md_present: context_str += "\n"
         context_str += "Context from Leoni Attributes Table:\n\n"
         for i, row in enumerate(attribute_rows):
             context_str += f"--- Attribute Row {i+1} ---\n"
@@ -344,8 +280,8 @@ def format_context(markdown_chunks, attribute_rows):
                     row_str_parts.append(f"  {key}: {json.dumps(value)}")
             context_str += "\n".join(row_str_parts)
             context_str += "\n---\n\n"
-    if not md_present and not attr_present:
-        return "No relevant information found in the knowledge base (documents or attributes)."
+    if not attr_present:
+        return "No relevant information found in the knowledge base (attributes)."
     return context_str.strip()
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -404,7 +340,6 @@ def run_chatbot():
         # Process the query
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                relevant_markdown_chunks = []
                 relevant_attribute_rows = []
                 context_was_found = False
                 generated_sql = None
@@ -418,17 +353,8 @@ def run_chatbot():
                     if relevant_attribute_rows:
                         context_was_found = True
 
-                # 3. Perform Vector Search (can be conditional)
-                run_vector_search = True
-                if run_vector_search:
-                    query_embedding = get_query_embedding(prompt)
-                    if query_embedding:
-                        relevant_markdown_chunks = find_relevant_markdown_chunks(query_embedding)
-                        if relevant_markdown_chunks:
-                            context_was_found = True
-
                 # 4. Prepare Context
-                context_str = format_context(relevant_markdown_chunks, relevant_attribute_rows)
+                context_str = format_context(relevant_attribute_rows)
 
                 # 5. Generate Response
                 prompt_for_llm = f"""Context:

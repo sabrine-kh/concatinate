@@ -78,7 +78,7 @@ def setup_vector_store(
     try:
         # If persisting, Chroma.from_documents handles creation and persistence directly
         # when the persist_directory argument is provided.
-        logger.info(f"Creating/Updating vector store '{collection_name}' with {len(documents)} document chunks...")
+        logger.info(f"Creating/Updating vector store '{collection_name}' with {len(documents)} documents...")
 
         # *** Add persist_directory argument here ***
         vector_store = Chroma.from_documents(

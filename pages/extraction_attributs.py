@@ -312,7 +312,7 @@ with st.sidebar:
 
             # --- Vector Store Indexing ---
             if processed_docs and len(processed_docs) > 0:
-                logger.info(f"Generated {len(processed_docs)} document chunks.")
+                logger.info(f"Generated {len(processed_docs)} documents.")
                 with st.spinner("Indexing documents in vector store..."):
                     try:
                         start_time = time.time()

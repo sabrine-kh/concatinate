@@ -49,12 +49,10 @@ def format_docs(docs: List[Document]) -> str:
     for i, doc in enumerate(docs):
         source = doc.metadata.get('source', 'Unknown')
         page = doc.metadata.get('page', 'N/A')
-        start_index = doc.metadata.get('start_index', None)
-        chunk_info = f"Chunk {i+1}" + (f" (starts at char {start_index})" if start_index is not None else "")
         context_parts.append(
-            f"{chunk_info} from '{source}' (Page {page}):\\n{doc.page_content}"
+            f"Document {i+1} from '{source}' (Page {page}):\n{doc.page_content}"
         )
-    return "\\n\\n---\\n\\n".join(context_parts)
+    return "\n\n---\n\n".join(context_parts)
 
 @logger.catch(reraise=True)
 def get_answer_from_llm_langchain(question: str, retriever: VectorStoreRetriever) -> Optional[str]:

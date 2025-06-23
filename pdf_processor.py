@@ -36,8 +36,7 @@ def encode_pil_image(pil_image: Image.Image, format: str = "PNG") -> Tuple[str, 
     img_byte = buffered.getvalue()
     return base64.b64encode(img_byte).decode('utf-8'), save_format.lower()
 
-async def process_single_pdf(file_path: str, file_basename: str, client: MistralClient, model_name: str, 
-                           text_splitter: RecursiveCharacterTextSplitter) -> List[Document]:
+async def process_single_pdf(file_path: str, file_basename: str, client: MistralClient, model_name: str) -> List[Document]:
     """Process a single PDF file and return its documents."""
     all_docs = []
     total_pages_processed = 0
@@ -127,25 +126,16 @@ Output only the generated Markdown content.
                     logger.debug(page_content)
                     logger.debug("-" * 40)
                     
-                    # Split the content into chunks
-                    logger.debug("Splitting content into chunks...")
-                    chunks = text_splitter.split_text(page_content)
-                    logger.info(f"Split content into {len(chunks)} chunks")
-                    logger.debug(f"Chunk sizes: {[len(chunk) for chunk in chunks]}")
-                    
-                    # Create Document objects for each chunk
-                    for j, chunk in enumerate(chunks):
-                        chunk_doc = Document(
-                            page_content=chunk,
-                            metadata={
-                                'source': file_basename,
-                                'page': page_num + 1,
-                                'chunk': j + 1,
-                                'total_chunks': len(chunks)
-                            }
-                        )
-                        all_docs.append(chunk_doc)
-                        logger.debug(f"Created document chunk {j + 1}/{len(chunks)}")
+                    # Instead of splitting into chunks, treat the whole page as one document
+                    chunk_doc = Document(
+                        page_content=page_content,
+                        metadata={
+                            'source': file_basename,
+                            'page': page_num + 1
+                        }
+                    )
+                    all_docs.append(chunk_doc)
+                    logger.debug(f"Created document for page {page_num + 1}")
                     
                     logger.success(f"Successfully processed page {page_num + 1} from {file_basename}")
                     total_pages_processed += 1
@@ -188,15 +178,6 @@ async def process_uploaded_pdfs(uploaded_files: List[BinaryIO], temp_dir: str = 
     os.makedirs(temp_dir, exist_ok=True)
     logger.debug("Ensured temporary directory exists")
     
-    # Initialize text splitter with config values
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=config.CHUNK_SIZE,
-        chunk_overlap=config.CHUNK_OVERLAP,
-        length_function=len,
-        is_separator_regex=False
-    )
-    logger.debug(f"Initialized text splitter with chunk_size={config.CHUNK_SIZE}, chunk_overlap={config.CHUNK_OVERLAP}")
-    
     # Initialize Mistral client
     try:
         client = MistralClient(api_key=os.getenv("MISTRAL_API_KEY"))
@@ -231,7 +212,7 @@ async def process_uploaded_pdfs(uploaded_files: List[BinaryIO], temp_dir: str = 
                 # Create a task that runs in the thread pool
                 task = loop.run_in_executor(
                     executor,
-                    lambda p, b: asyncio.run(process_single_pdf(p, b, client, model_name, text_splitter)),
+                    lambda p, b: asyncio.run(process_single_pdf(p, b, client, model_name)),
                     file_path,
                     file_basename
                 )
