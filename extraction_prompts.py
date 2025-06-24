@@ -454,7 +454,6 @@ Determine cavity count using this reasoning chain:
          • Engineering drawings > Marketing docs
       2. Prefer physical labels over part numbers
       3. Use highest explicit number when ambiguous
-
     STEP 4: CAVITY SYNONYM RESOLUTION
     - Map terms to numbers:
       ✓ \"Single-cavity\"/\"1-posn\"/\"1-way\" → 1
@@ -928,117 +927,80 @@ According to their qualification for usage under different environmental conditi
 CONTACT_SYSTEMS_PROMPT = """
 Identify approved contact systems using this reasoning chain:
 
-    STEP 1: SOURCE IDENTIFICATION
-    - Scan for:
-      ✓ Explicit system families (MQS, MLK, SLK, etc.)
-      ✓ Terminal part numbers (123-4567, XW3D-XXXX-XX)
-      ✓ Manufacturer approval statements:
-        * \"Approved for use with...\"
-        * \"Compatible contact systems:\"
-        * \"Recommended mating system\"
+STEP 1: SOURCE IDENTIFICATION
+- Scan for:
+  ✓ Explicit system families (MQS, MLK, SLK, MCP, MCON, TAB, etc.)
+  ✓ Terminal part numbers (e.g., 123-4567, XW3D-XXXX-XX)
+  ✓ Manufacturer approval statements:
+    * "Approved for use with..."
+    * "Compatible contact systems:"
+    * "Recommended mating system"
 
-    STEP 2: MANUFACTURER PRIORITIZATION
-    - Verify mentions are supplier-specified:
-      ✓ Direct manufacturer recommendations
-      ✗ Customer-specific part numbers
-      ✗ Generic terminal references
+STEP 1.5: LAYOUT-BASED INFERENCE
+- If a contact system (e.g., MCP 2.5) appears in the same section, header, or table as a part number or drawing title, and no other systems are mentioned, assume it is the approved system.
+- Example:
+    Drawing Title: Plug Assembly, Sealed, 1 Posn  
+    Part Number: 2098198-5  
+    MCP 2.5 
+  → CONTACT SYSTEMS: mcp 2.5
 
-    STEP 3: SYSTEM RESOLUTION HIERARCHY
-    1. Primary: Explicit family mentions (MQS 0.64)
-    2. Secondary: Part number mapping:
-       - Cross-reference with manufacturer catalogs
-       - Match patterns (e.g., 928321-1 → TE MCP 1.2)
-    3. Reject unidentifiable part numbers
+STEP 2: MANUFACTURER PRIORITIZATION
+- Verify the mention is supplier-specified:
+  ✓ Direct manufacturer recommendations
+  ✗ Customer-specific part numbers
+  ✗ Generic or vague references like “2.8mm systems”
 
-    STEP 4: MULTI-SYSTEM VALIDATION
-    - Check for:
-      ✓ Multiple approval statements
-      ✓ Hybrid connector systems
-      ✓ Generation variants (MQS Gen2 vs Gen3)
-    - Require explicit documentation for each system
+STEP 3: SYSTEM RESOLUTION HIERARCHY
+1. Primary: Explicit family mentions (e.g., MQS 0.64)
+2. Secondary: Terminal part number mapping:
+   - Cross-reference against known manufacturer catalogs
+   - Example: 928321-1 → TE MCP 1.2
+3. Reject unidentifiable or uncatalogued part numbers
 
-    STEP 5: STANDARDIZATION CHECK
-    - Convert to manufacturer nomenclature:
-      \"Micro Quadlock\" → MQS
-      \"H-MTD\" → HMTD
-    - Maintain versioning: MLK 1.2 ≠ MLK 2.0
+STEP 4: MULTI-SYSTEM VALIDATION
+- Accept multiple systems only if:
+  ✓ Clearly documented
+  ✓ Hybrid terminal system is described
+  ✓ Variants (e.g., MQS Gen2 vs Gen3) are explicitly listed
 
-    **Examples:**
-    - **\"Approved systems: MQS 0.64 & SLK 2.8 (P/N 345-789)\"**
-      → REASONING: [Step1] MQS/SLK explicit → [Step2] Approved → [Step5] Standardized
-      → CONTACT SYSTEMS: **MQS 0.64,SLK 2.8**
-    - **\"Terminals: 927356-1 (MCP 1.5K series)\"**
-      → REASONING: [Step1] Part number → [Step3] Mapped to MCP → [Step2] Implicit approval
-      → CONTACT SYSTEMS: **MCP 1.5K**
-    - **"This housing uses TAB 1.5 terminals."**
-      → REASONING: [Step1] Explicit family mention → [Step5] Standardized
-      → CONTACT SYSTEMS: **TAB 1.5**
-    - **"Compatible with MCON 1.2 terminals."**
-      → REASONING: [Step1] Explicit family mention
-      → CONTACT SYSTEMS: **MCON 1.2**
-    - **"Designed for MLK 1.2 Sm terminals."**
-      → REASONING: [Step1] Explicit family mention
-      → CONTACT SYSTEMS: **MLK 1.2 Sm**
-    - **\"Compatible with various 2.8mm systems\"**
-      → REASONING: [Step1] Vague → [Step5] Non-specific → [Final] NOT FOUND
-      → CONTACT SYSTEMS: **NOT FOUND**
+STEP 5: STANDARDIZATION CHECK
+- Normalize naming:
+  "Micro Quadlock" → MQS  
+  "H-MTD" → HMTD  
+- Maintain system distinctions:
+  MLK 1.2 ≠ MLK 2.0
 
-    **Output format:**
-    CONTACT SYSTEMS: [system1,system2,...]
+**Examples:**
+- "Approved systems: MQS 0.64 & SLK 2.8 (P/N 345-789)"
+  → REASONING: [Step1] MQS/SLK explicit → [Step2] Approved → [Step5] Standardized
+  → CONTACT SYSTEMS: mqs 0.64, slk 2.8
+
+- "Terminals: 927356-1 (MCP 1.5K series)"
+  → REASONING: [Step1] Part number → [Step3] Mapped to MCP → [Step2] Implicit approval
+  → CONTACT SYSTEMS: mcp 1.5k
+
+- "This housing uses TAB 1.5 terminals."
+  → REASONING: [Step1] Explicit family mention → [Step5] Standardized
+  → CONTACT SYSTEMS: tab 1.5
+
+- "Compatible with MCON 1.2 terminals."
+  → REASONING: [Step1] Explicit family mention
+  → CONTACT SYSTEMS: mcon 1.2
+
+- "Designed for MLK 1.2 Sm terminals."
+  → REASONING: [Step1] Explicit family mention
+  → CONTACT SYSTEMS: mlk 1.2 sm
+
+- "Compatible with various 2.8mm systems"
+  → REASONING: [Step1] Vague → [Step5] Non-specific → [Final] NOT FOUND
+  → CONTACT SYSTEMS: not found
+
+**Output format:**
+CONTACT SYSTEMS: system1, system2
+If no system is found, return:
+CONTACT SYSTEMS: not found
 """
 
-TERMINAL_POSITION_ASSURANCE_PROMPT = """
-Determine Terminal Position Assurance (TPA) count using this reasoning chain:
-
-    STEP 1: TPA IDENTIFICATION
-    - Scan documents for:
-      ✓ Explicit terms: \"TPA\", \"Terminal Position Assurance\", \"Anti-Backout\"
-      ✓ Part numbers with TPA identifiers (e.g., \"-TPA1\", \"-2T\")
-      ✓ Assembly diagrams showing TPA components
-
-    STEP 2: PREASSEMBLY STATUS CHECK
-    - Verify if TPA is **delivered preinstalled**:
-      ✓ \"Preassembled TPA\"
-      ✓ \"Included with housing\"
-      ✗ \"Assemble TPA during production\" → Return 0
-
-    STEP 3: COUNT RESOLUTION
-    - For preassembled TPAs:
-      1. Direct count: \"Dual TPAs\" → 2
-      2. Position-based inference:
-         * \"1 TPA per 12 cavities\" → Total = Cavities ÷ 12
-         * Single-position connector → Default 1
-    - For multiple TPAs:
-      ✓ Sum explicitly stated numbers
-      ✓ Reject ambiguous terms (\"Multiple TPAs\" → NOT FOUND)
-
-    STEP 4: VALIDATION
-    - Confirm TPA count aligns with:
-      ✓ Physical connector size/cavities
-      ✓ Manufacturer specifications
-    - Implausible counts (e.g., 5 TPAs on 2-cavity connector) → NOT FOUND
-
-    STEP 5: DEFAULT HANDLING
-    - No TPA mentions after Step 1? → Return **None**
-    - Assembly required? → 0
-
-    **Examples:**
-    - **"The connector has no Terminal Position Assurance feature."**
-      → REASONING: [Step1] Explicit denial
-      → TERMINAL POSITION ASSURANCE: **None**
-    - **"The connector is delivered with one TPA."**
-      → REASONING: [Step1] TPA mentioned → [Step3] Explicit count "one"
-      → TERMINAL POSITION ASSURANCE: **1**
-    - **\"Preassembled dual TPA (P/N TPA2-456)\"**
-      → REASONING: [Step1] TPA term + P/N → [Step2] Preassembled → [Step3] Explicit count
-      → TERMINAL POSITION ASSURANCE: **2**
-    - **\"Install TPA-7A during wire harnessing\"**
-      → REASONING: [Step2] Requires assembly → Return 0
-      → TERMINAL POSITION ASSURANCE: **0**
-
-    **Output format:**
-    TERMINAL POSITION ASSURANCE: [number/0/None]
-"""
 
 CONNECTOR_POSITION_ASSURANCE_PROMPT = """
 Determine Connector Position Assurance (CPA) status using this reasoning chain:
