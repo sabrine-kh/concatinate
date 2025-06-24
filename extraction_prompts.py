@@ -5,6 +5,16 @@
 MATERIAL_PROMPT = """
 Extract material filling additives:
  Material filling describes additives added to the base material in order to influence the mechanical material characteristics. Most common additives are GF (glass-fiber), GB (glass-balls), MF (mineral-fiber) and T (talcum).
+    **Examples:**
+    - "Material: PA66-GF30"
+      → MATERIAL FILLING: **GF**
+    - "Part uses pure PA6 with no fillers."
+      → MATERIAL FILLING: **none**
+    - "Housing made of PEEK-CF15 (carbon fiber)"
+      → MATERIAL FILLING: **CF**
+    - "Composite of PA66 with GB and GF additives"
+      → MATERIAL FILLING: **(GB+GF)**
+
     **Output format:**
     MATERIAL FILLING: [abbreviations/none]
 """
@@ -49,9 +59,41 @@ Extract primary polymer material using this reasoning chain:
 
     **Examples:**
     - **\"Connector: PA6-GF30 (60% resin)\"**
-      → REASONING: [Step1 ✓] PA6+GF → [Step2 ✓] PA6 → [Step3 ✓] 60% → [Step4 ✓] Specific grade → [Step5 ✓] Validated
+      → REASONING: [Step1 ✓] PA6+GF → [Step2 ✓] PA6 → [Step5 ✓] Validated
       → MATERIAL NAME: **PA6**
-
+    - **"Main housing material: PA66"**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PA66**
+    - **"Made from PBT resin."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PBT**
+    - **"Generic Polyamide (PA) is used for the housing."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PA**
+    - **"The grommet is made of Silicone Rubber."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **SILICONE RUBBER**
+    - **"This component is made of standard plastics."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PLASTICS**
+    - **"The latch is molded from Polypropylene (PP)."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PP**
+    - **"A blend of Polyamide and Syndiotactic Polystyrene (PA+SPS) is specified."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PA+SPS**
+    - **"Material specification calls for PA12."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PA12**
+    - **"The insulator is made of PET."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PET**
+    - **"Body material is a blend of PA66 and PA6."**
+      → REASONING: [Step1 ✓] Blend detected → [Step3 ✓] First mentioned is PA66, but a blend is specified → [Step4 ✓] Use combined name
+      → MATERIAL NAME: **PA66+PA6**
+    - **"Clear cover made from Polycarbonate (PC)."**
+      → REASONING: [Step1 ✓] Explicit declaration → [Step5 ✓] Validated
+      → MATERIAL NAME: **PC**
     - **\"Housing: GF40 Polymer\"**
       → REASONING: [Step1 ✓] GF additive → [Step2 ✗] No base polymer → [Step5 ✗] Uncertain
       → MATERIAL NAME: **NOT FOUND**
@@ -105,20 +147,18 @@ Determine Pull-To-Seat requirement using this reasoning chain:
       3. No alternative retention methods ✓
     - Any ambiguity → Default to \"No\"
 
-    Examples:
-    \"Terminals require pull-back action for seating\"
-    → REASONING: [Step1] Pull-back → [Step2] Assembly → [Step4] Manual action
-    → PULL-TO-SEAT: Yes
+    **Examples:**
+    - **\"Terminals require pull-back action for seating\"**
+      → REASONING: [Step1] Pull-back → [Step2] Assembly → [Step4] Manual action
+      → PULL-TO-SEAT: **Yes**
+    - **\"Pre-inserted contacts with CPA secondary lock\"**
+      → REASONING: [Step1] Pre-inserted → [Step3] Alternative method
+      → PULL-TO-SEAT: **No**
+    - **\"Secure insertion method\"**
+      → REASONING: [Step1] Vague → [Step5] Ambiguous
+      → PULL-TO-SEAT: **No**
 
-    \"Pre-inserted contacts with CPA secondary lock\"
-    → REASONING: [Step1] Pre-inserted → [Step3] Alternative method
-    → PULL-TO-SEAT: No
-
-    \"Secure insertion method\"
-    → REASONING: [Step1] Vague → [Step5] Ambiguous
-    → PULL-TO-SEAT: No
-
-  Output format:
+    **Output format:**
     PULL-TO-SEAT: [Yes/No]
 """
 
@@ -198,21 +238,18 @@ STEP 5: FINAL VALIDATION
 
     Ensure the reasoning aligns with the priority rules.
 
-Examples:
+**Examples:**
+- **\"Part Name: Receptacle Assembly. Drawing shows pin contacts in all positions.\"**
+  → REASONING: [Step1] Pin contacts (Male function) → [Step3] "Receptacle" = Female assembly → [Step4] Priority Rule applied: Manufacturer Nomenclature 'Receptacle' determines Female assembly gender, overriding internal contact type → [Step5] Uniform Female assembly.
+  → GENDER: **female**
+- **\"Part Name: Plug Assembly. Document specifies applicable socket terminals.\"**
+  → REASONING: [Step1] Socket terminals (Female function) → [Step3] "Plug" = Male assembly → [Step4] Priority Rule applied: Manufacturer Nomenclature 'Plug' determines Male assembly gender, overriding internal contact type → [Step5] Uniform Male assembly.
+  → GENDER: **male**
+- **\"Combo Connector: Cavities A1-A5 accept pins, B1-B5 accept sockets.\"**
+  → REASONING: [Step1] Both Pin & Socket contacts → [Step2] Separate cavities → [Step3] "Combo" = Likely Hybrid → [Step4] Cavity evidence confirms Hybrid → [Step5] Hybrid assembly.
+  → GENDER: **Hybrid**
 
-"Part Name: Receptacle Assembly. Drawing shows pin contacts in all positions."
-→ REASONING: [Step1] Pin contacts (Male function) → [Step3] "Receptacle" = Female assembly → [Step4] Priority Rule applied: Manufacturer Nomenclature 'Receptacle' determines Female assembly gender, overriding internal contact type → [Step5] Uniform Female assembly.
-→ GENDER: Female
-
-"Part Name: Plug Assembly. Document specifies applicable socket terminals."
-→ REASONING: [Step1] Socket terminals (Female function) → [Step3] "Plug" = Male assembly → [Step4] Priority Rule applied: Manufacturer Nomenclature 'Plug' determines Male assembly gender, overriding internal contact type → [Step5] Uniform Male assembly.
-→ GENDER: Male
-
-"Combo Connector: Cavities A1-A5 accept pins, B1-B5 accept sockets."
-→ REASONING: [Step1] Both Pin & Socket contacts → [Step2] Separate cavities → [Step3] "Combo" = Likely Hybrid → [Step4] Cavity evidence confirms Hybrid → [Step5] Hybrid assembly.
-→ GENDER: Hybrid
-
-Output format:
+**Output format:**
 REASONING: [Key determinations following the steps and priority rule]
 GENDER: [Male/Female/Unisex/Hybrid]
 """
@@ -263,20 +300,18 @@ Determine connector height using this reasoning chain:
       ✓ Max height = 150mm
     - Implausible values? → 999
 
-    Examples:
-    \"Rectangular housing Y=6.2mm + CPA locked (+1.0mm)\"
-    → REASONING: [Step2] Y-components → [Step4] 6.2+1 → [Step5] Sum
-    → HEIGHT [MM]: 7.2
+    **Examples:**
+    - **\"Rectangular housing Y=6.2mm + CPA locked (+1.0mm)\"**
+      → REASONING: [Step2] Y-components → [Step4] 6.2+1 → [Step5] Sum
+      → HEIGHT [MM]: **7.2**
+    - **\"Round connector Ø8.4 with radial seal\"**
+      → REASONING: [Step1] Round → [Step5] Diameter=height
+      → HEIGHT [MM]: **8.4**
+    - **\"X=15mm/Y=18mm (special profile)\"**
+      → REASONING: [Step1] Y>X allowed → [Step3] Direct Y-value
+      → HEIGHT [MM]: **18**
 
-    \"Round connector Ø8.4 with radial seal\"
-    → REASONING: [Step1] Round → [Step5] Diameter=height
-    → HEIGHT [MM]: 8.4
-
-    \"X=15mm/Y=18mm (special profile)\"
-    → REASONING: [Step1] Y>X allowed → [Step3] Direct Y-value
-    → HEIGHT [MM]: 18
-
-    Output format:
+    **Output format:**
     HEIGHT [MM]: [value/999]
 """
 
@@ -327,20 +362,18 @@ Determine connector length using this reasoning chain:
       ✓ Max length = 500mm
     - Implausible values? → 999
 
-    Examples:
-    \"Rectangular Z=25mm + CPA locked (+2.0mm)\"
-    → REASONING: [Step2] Z-components → [Step4] 25+2 → [Step6] Valid
-    → LENGTH [MM]: 27
+    **Examples:**
+    - **\"Rectangular Z=25mm + CPA locked (+2.0mm)\"**
+      → REASONING: [Step2] Z-components → [Step4] 25+2 → [Step6] Valid
+      → LENGTH [MM]: **27**
+    - **\"Round connector Ø12mm (Z=15mm)\"**
+      → REASONING: [Step1] Round → [Step3] Direct Z-value
+      → LENGTH [MM]: **15**
+    - **\"2023 Spec: 40mm | 2025 Spec: 35mm\"**
+      → REASONING: [Step5] Newer doc → [Step6] Valid
+      → LENGTH [MM]: **35**
 
-    \"Round connector Ø12mm (Z=15mm)\"
-    → REASONING: [Step1] Round → [Step3] Direct Z-value
-    → LENGTH [MM]: 15
-
-    \"2023 Spec: 40mm | 2025 Spec: 35mm\"
-    → REASONING: [Step5] Newer doc → [Step6] Valid
-    → LENGTH [MM]: 35
-
-    Output format:
+    **Output format:**
     LENGTH [MM]: [value/999]
 """
 
@@ -382,20 +415,18 @@ Determine connector width using this reasoning chain:
       ✓ Max width = 300mm
     - Implausible values? → NOT FOUND
 
-    Examples:
-    \"Rectangular housing X=32mm (CPA locked)\"
-    → REASONING: [Step1] Rect ✓ → [Step3] Direct value
-    → WIDTH [MM]: 32
+    **Examples:**
+    - **\"Rectangular housing X=32mm (CPA locked)\"**
+      → REASONING: [Step1] Rect ✓ → [Step3] Direct value
+      → WIDTH [MM]: **32**
+    - **\"Round connector Ø15.5 + TPA (+0.7mm)\"**
+      → REASONING: [Step1] Round → [Step2] 15.5+0.7 → 16.2
+      → WIDTH [MM]: **16.2**
+    - **\"X-axis: 25mm (pre-lock) / 26.2mm (CPA engaged)\"**
+      → REASONING: [Step2] Locked state → 26.2
+      → WIDTH [MM]: **26.2**
 
-    \"Round connector Ø15.5 + TPA (+0.7mm)\"
-    → REASONING: [Step1] Round → [Step2] 15.5+0.7 → 16.2
-    → WIDTH [MM]: 16.2
-
-    \"X-axis: 25mm (pre-lock) / 26.2mm (CPA engaged)\"
-    → REASONING: [Step2] Locked state → 26.2
-    → WIDTH [MM]: 26.2
-
-    Output format:
+    **Output format:**
     WIDTH [MM]: [value]
 """
 
@@ -437,26 +468,44 @@ Determine cavity count using this reasoning chain:
       2. From approved sources (title block/diagram/PN)
       3. No conflicting evidence in latest doc
 
-    Examples:
-    \"Housing: 4-CAVITY (DW-123 Rev.3)\"
-    → REASONING: [Step1] Title block → [Step3] Latest rev → [Step5] Valid
-    → NUMBER OF CAVITIES: 4
+    **Examples:**
+    - **"Single-cavity housing for main power."**
+      → REASONING: [Step4] "Single-cavity" → 1 → [Step5] Valid
+      → NUMBER OF CAVITIES: **1**
+    - **\"PN: XT-60-2P (marketing sheet: 3-way)\"**
+      → REASONING: [Step1] Conflict → [Step3] Prefer PN suffix → [Step4] 2P=2
+      → NUMBER OF CAVITIES: **2**
+    - **\"Housing: 4-CAVITY (DW-123 Rev.3)\"**
+      → REASONING: [Step1] Title block → [Step3] Latest rev → [Step5] Valid
+      → NUMBER OF CAVITIES: **4**
+    - **"The part is a 12-position connector housing."**
+      → REASONING: [Step1] Explicit number → [Step4] 'position' = 'cavity' → [Step5] Valid
+      → NUMBER OF CAVITIES: **12**
+    - **"Specification sheet lists 32 positions."**
+      → REASONING: [Step1] Explicit number → [Step4] 'positions' = 'cavities' → [Step5] Valid
+      → NUMBER OF CAVITIES: **32**
+    - **\"Single-row connector (no numbers)\"**
+      → REASONING: [Step1] No indicators → [Step5] Default
+      → NUMBER OF CAVITIES: **999**
 
-    \"PN: XT-60-2P (marketing sheet: 3-way)\"
-    → REASONING: [Step1] Conflict → [Step3] Prefer PN suffix → [Step4] 2P=2
-    → NUMBER OF CAVITIES: 2
-
-    \"Single-row connector (no numbers)\"
-    → REASONING: [Step1] No indicators → [Step5] Default
-    → NUMBER OF CAVITIES: 999
-
-    Output format:
+    **Output format:**
     NUMBER OF CAVITIES: [value/999]
 """
 
 NUMBER_OF_ROWS_PROMPT = """
-Determine the number of rows 
+Determine the number of rows by identifying explicit mentions or inferring from the physical layout described in the document.
     
+    **Examples:**
+    - **"The connector does not have a row-based structure."**
+      → NUMBER OF ROWS: **0**
+    - **"Single-row header for PCB."**
+      → NUMBER OF ROWS: **1**
+    - **"A dual-row, 12-position connector."**
+      → NUMBER OF ROWS: **2**
+    - **"Diagram shows 24 cavities arranged in a 4x6 grid."**
+      → NUMBER OF ROWS: **4**
+    - **"This 63-pin connector is arranged in 7 rows."**
+      → NUMBER OF ROWS: **7**
 """
 
 MECHANICAL_CODING_PROMPT = """
@@ -507,20 +556,27 @@ Determine mechanical coding using this reasoning chain:
       3. Physical feature verification
       4. Single definitive answer
 
-    Examples:
-    \"Positioning: Coding C (DWG-123 Rev.2)\"
-    → REASONING: [Step1] Explicit → [Step3] Valid case → [Step5] Confirmed
-    → MECHANICAL CODING: C
+    **Examples:**
+    - **"This part has no mechanical keying features."**
+      → REASONING: [Step3] Explicit negative → [Step5] Confirmed
+      → MECHANICAL CODING: **None**
+    - **\"Positioning: Coding C (DWG-123 Rev.2)\"**
+      → REASONING: [Step1] Explicit → [Step3] Valid case → [Step5] Confirmed
+      → MECHANICAL CODING: **C**
+    - **"This variant is mechanically coded with keying 'V'."**
+      → REASONING: [Step1] Explicit 'V' → [Step3] Valid named code → [Step5] Confirmed
+      → MECHANICAL CODING: **V**
+    - **\"Universal connector for all variants\"**
+      → REASONING: [Step3] Family-wide → Z
+      → MECHANICAL CODING: **Z**
+    - **"The connector has a neutral keying for universal mating."**
+      → REASONING: [Step1] "neutral" indicator → [Step3] Universal → [Step5] Confirmed
+      → MECHANICAL CODING: **Neutral**
+    - **\"Keyed slots shown in Fig.5 (unlabeled)\"**
+      → REASONING: [Step2] Visual-only → [Step3] Ambiguous → \"no naming\"
+      → MECHANICAL CODING: **no naming**
 
-    \"Keyed slots shown in Fig.5 (unlabeled)\"
-    → REASONING: [Step2] Visual-only → [Step3] Ambiguous → \"no naming\"
-    → MECHANICAL CODING: no naming
-
-    \"Universal connector for all variants\"
-    → REASONING: [Step3] Family-wide → Z
-    → MECHANICAL CODING: Z
-
-    Output format:
+    **Output format:**
     MECHANICAL CODING: [A/B/C/D/Z/no naming/none]
 """
 
@@ -553,10 +609,10 @@ Determine connector color using this reasoning chain:
 
     STEP 4: CONTEXT VALIDATION
     - Reject ambiguous terms:
-      ✗ \"Natural\" (unless defined)
+      ✗ \"Natural\" (unless defined by a specific color code like '101 nt')
       ✗ Material-inferred colors (brass=golden)
-    - Accept only explicitly stated colors:
-      ✓ \"Black housing\"
+    - Accept only explicitly stated colors or codes:
+      ✓ \"Black housing\", "Colour: 000 bk"
       ✓ \"Blue CPA latch\"
 
     STEP 5: FINAL RESOLUTION
@@ -566,21 +622,28 @@ Determine connector color using this reasoning chain:
       3. Multi-color indicators
       4. NOT FOUND
 
-    Examples:
-    \"Black nylon housing with nickel-plated contacts\"
-    → REASONING: [Step1] Single-piece → [Step2] Housing color → [Step4] Explicit
-    → COLOUR: Black
+    **Examples:**
+    - **\"Black nylon housing with nickel-plated contacts\"**
+      → REASONING: [Step1] Single-piece → [Step2] Housing color → [Step4] Explicit
+      → COLOUR: **000 bk**
+    - **"Connector color is natural (code 101 nt)."**
+      → REASONING: [Step4] Explicitly defined natural color
+      → COLOUR: **101 nt**
+    - **"The part is yellow, specified as 111 ye."**
+      → REASONING: [Step4] Explicit color name and code
+      → COLOUR: **111 ye**
+    - **"The connector body is grey (color code 777 gy)."**
+      → REASONING: [Step1] Single-piece → [Step4] Explicit color name and code
+      → COLOUR: **777 gy**
+    - **\"Assembly: White cover (60%), grey base (40%)\"**
+      → REASONING: [Step1] Assembly → [Step3] White dominant → [Step5] Majority
+      → COLOUR: **999 wh**
+    - **\"Red/blue dual-tone design\"**
+      → REASONING: [Step1] Single-piece → [Step3] Equal prominence → [Step5] Multi
+      → COLOUR: **multi**
 
-    \"Assembly: White cover (60%), grey base (40%)\"
-    → REASONING: [Step1] Assembly → [Step3] White dominant → [Step5] Majority
-    → COLOUR: White
-
-    \"Red/blue dual-tone design\"
-    → REASONING: [Step1] Single-piece → [Step3] Equal prominence → [Step5] Multi
-    → COLOUR: multi
-
-    Output format:
-    COLOUR: [color/multi]
+    **Output format:**
+    COLOUR: [color_code/multi]
 """
 
 COLOUR_CODING_PROMPT = """
@@ -619,17 +682,22 @@ Determine Colour Coding using this reasoning chain:
       3. Color-coding purpose clearly stated
     - Reject isolated color mentions
 
-    EXAMPLES:
-    \"Type A (Blue CPA) vs Type B (Red CPA)\"
-    → REASONING: [Step1] Mech coding ✓ → [Step3] Color diff ✓ → [Step4] Explicit
-    → COLOUR CODING: Blue/Red (depending on variant)
+    **Examples:**
+    - **\"Type A (Blue CPA) vs Type B (Red CPA)\"**
+      → REASONING: [Step1] Mech coding ✓ → [Step3] Color diff ✓ → [Step4] Explicit
+      → COLOUR CODING: **Blue** or **Red** (depending on variant)
+    - **"The coding key for this connector is Orange."**
+      → REASONING: [Step1] Mech coding assumed ✓ → [Step2] Coding key ✓ → [Step3] Orange differs from housing (assumed) → [Step4] Explicit color
+      → COLOUR CODING: **Orange**
+    - **"Housing is natural, with a Pink CPA for coding."**
+      → REASONING: [Step1] Mech coding ✓ → [Step3] Color diff ✓ → [Step4] Explicit
+      → COLOUR CODING: **Pink**
+    - **\"Black housing with black CPA/TTA\"**
+      → REASONING: [Step1] Mech coding ✓ → [Step3] No diff → \"none\"
+      → COLOUR CODING: **None**
 
-    \"Black housing with black CPA/TTA\"
-    → REASONING: [Step1] Mech coding ✓ → [Step3] No diff → \"none\"
-    → COLOUR CODING: none
-
-    Output format:
-    COLOUR CODING: [Color/none]
+    **Output format:**
+    COLOUR CODING: [Color/None]
 """
 
 # --- Sealing & Environmental ---
@@ -682,20 +750,21 @@ Determine working temperatures using this reasoning chain:
     - Both values = 999? → NOT FOUND
     - Any value ≠999? → Final output
 
-    Examples:
-    \"Rated for -40°C → 125°C (AEC-Q200)\"
-    → REASONING: [Step1] Explicit range + automotive standard → [Step2] Max=125 → [Step3] Min=-40
-    → WORKING TEMPERATURE: 125, -40
+    **Examples:**
+    - **\"Rated for -40°C → 125°C (AEC-Q200)\"**
+      → REASONING: [Step1] Explicit range + automotive standard → [Step2] Max=125 → [Step3] Min=-40
+      → WORKING TEMPERATURE: **/125.000/-40.0000**
+    - **\"Max. temp 150°C (UL RTI)\"**
+      → REASONING: [Step1] Explicit max + UL → [Step2] Max=150 → [Step3] No min → 999
+      → WORKING TEMPERATURE: **/150.000/-1**
+    - **"Operational range: -55C to 85C"**
+      → REASONING: [Step1] Explicit range → [Step2] Max=85 → [Step3] Min=-55
+      → WORKING TEMPERATURE: **/85.0000/-55.0000**
+    - **\"High-temp polymer connector\"**
+      → REASONING: [Step1] No data → [Step5] Both 999
+      → WORKING TEMPERATURE: **NOT FOUND**
 
-    \"Max. temp 150°C (UL RTI)\"
-    → REASONING: [Step1] Explicit max + UL → [Step2] Max=150 → [Step3] No min → 999
-    → WORKING TEMPERATURE: 150, 999
-
-    \"High-temp polymer connector\"
-    → REASONING: [Step1] No data → [Step5] Both 999
-    → WORKING TEMPERATURE: NOT FOUND
-
-  Output format:
+  **Output format:**
     WORKING TEMPERATURE: /[Max]/[Min]
 """
 
@@ -743,26 +812,23 @@ STEP 5: FINAL VALIDATION
   3. Single validated occurrence
   4. Housing-specific reference
 
-Examples:
-"Housing-to-counterpart seal: radial seal"
-→ REASONING: [Step1] Match → [Step2] Context → Valid
-→ HOUSING SEAL: Radial Seal
+**Examples:**
+- **"Housing-to-counterpart seal: radial seal"**
+  → REASONING: [Step1] Match → [Step2] Context → Valid
+  → HOUSING SEAL: **radial seal**
+- **"The datasheet specifies an interface seal for mating."**
+  → REASONING: [Step1] Match 'interface seal' → [Step2] Context is mating → Valid
+  → HOUSING SEAL: **interface seal**
+- **"This is an unsealed indoor connector with no housing seal."**
+  → REASONING: [Step1] Explicit denial → Valid
+  → HOUSING SEAL: **none**
+- **"Connector uses a molded ring seal to prevent ingress"**
+  → REASONING: [Step4] Ring Seal Detected → [Step2] Context → Valid Mapping
+  → HOUSING SEAL: **radial seal**
 
-"interface seal (P/N RS-456)"
-→ REASONING: [Step1] Match → [Step2] Not about housing → Rejected
-→ HOUSING SEAL: NOT FOUND
-
-"Radial Seal (primary) + Interface Seal (secondary)"
-→ REASONING: [Step1] Multiple → [Step3] Hierarchy → Radial
-→ HOUSING SEAL: Radial Seal
-
-"Connector uses a molded ring seal to prevent ingress"
-→ REASONING: [Step4] Ring Seal Detected → [Step2] Context → Valid Mapping
-→ HOUSING SEAL: Radial Seal
-
-Output format:
+**Output format:**
 REASONING: [Key determinations]
-HOUSING SEAL: [Radial Seal / Interface Seal ]
+HOUSING SEAL: [radial seal/interface seal/none]
 
 """
 
@@ -771,8 +837,21 @@ Determine the Wire Seal type:
 
     Wire seal describes the sealing of the space between wire and cavity wall, when a terminal is fitted in a cavity. There are different possibilities for sealing available: Single wire seal, Injected, Mat seal (includes “gel family seal” and “silicone family seal”), None.
 
-    Output format:
-    WIRE SEAL: [Single Wire Seal/Injected/Mat Seal/None]
+    **Examples:**
+    - **"Each cavity is sealed with a single wire seal."**
+      → WIRE SEAL: **single wire seal**
+    - **"The connector features a one-piece mat seal for all positions."**
+      → WIRE SEAL: **Mat seal**
+    - **"This is an unsealed connector; no wire seals are used."**
+      → WIRE SEAL: **none**
+    - **"Uses a silicone family seal for wire entry."**
+      → REASONING: "silicone family seal" is a type of mat seal.
+      → WIRE SEAL: **Silicone family seal**
+    - **"A family seal is used to accommodate multiple wire diameters."**
+      → WIRE SEAL: **family seal**
+
+    **Output format:**
+    WIRE SEAL: [single wire seal/Mat seal/Silicone family seal/family seal/none]
 """
 
 SEALING_PROMPT = """
@@ -785,8 +864,8 @@ Determine sealing status using this reasoning chain:
 
     STEP 2: IP-BASED CLASSIFICATION
     - If valid IP codes found:
-      → IPx0 → **Unsealed**
-      → Any other valid code → **Sealed**
+      → IPx0 → **unsealed**
+      → Any other valid code → **sealed**
     - If multiple IP codes:
       → Use highest protection level (e.g., IPx9K > IPx7)
 
@@ -806,32 +885,42 @@ Determine sealing status using this reasoning chain:
       3. Default to NOT FOUND
 
     STEP 5: FINAL VALIDATION
-    - **Sealed** requires:
+    - **sealed** requires:
       ✓ IP code ≥IPx4 OR
       ✓ Functional sealing description
-    - **Unsealed** requires:
+    - **unsealed** requires:
       ✓ IPx0 OR
       ✓ Explicit lack of sealing
 
-    Examples:
-    \"IPx9K-rated for high-pressure washdown\"
-    → REASONING: [Step1] IPx9K → [Step2] Sealed
-    → SEALING: Sealed
+    **Examples:**
+    - **\"IPx9K-rated for high-pressure washdown\"**
+      → REASONING: [Step1] IPx9K → [Step2] Sealed
+      → SEALING: **sealed**
+    - **\"No IP rating but includes silicone gasket\"**
+      → REASONING: [Step1] No IP → [Step3] Gasket → Sealed
+      → SEALING: **sealed**
+    - **\"IPx0 connector with 'dust-resistant' claim\"**
+      → REASONING: [Step1] IPx0 → [Step4] Overrides description → Unsealed
+      → SEALING: **unsealed**
 
-    \"No IP rating but includes silicone gasket\"
-    → REASONING: [Step1] No IP → [Step3] Gasket → Sealed
-    → SEALING: Sealed
-
-    \"IPx0 connector with 'dust-resistant' claim\"
-    → REASONING: [Step1] IPx0 → [Step4] Overrides description → Unsealed
-    → SEALING: Unsealed
-
-    Output format:
-    SEALING: [Sealed/Unsealed]
+    **Output format:**
+    SEALING: [sealed/unsealed]
 """
 
 SEALING_CLASS_PROMPT = """
 According to their qualification for usage under different environmental conditions, systems are divided in corresponding protection classes, so-called IP-codes. The abbreviation IP means "International Protection" according DIN; in the English-speaking countries, the classes are called "Ingress Protection".
+
+    **Examples:**
+    - **"Datasheet: Rated IPx7 and IPx9K."**
+      → SEALING CLASS: **IPx7,IPx9K**
+    - **"This connector is IPx4 compliant."**
+      → SEALING CLASS: **IPx4**
+    - **"An unsealed connector with IPx0 rating."**
+      → SEALING CLASS: **IPx0**
+    - **"An unsealed connector with no IP rating."**
+      → SEALING CLASS: **not defined**
+    - **"The connector is protected against water jets (IPx6) and temporary immersion (IPx7)."**
+      → SEALING CLASS: **IPx6,IPx7**
 """
 
 # --- Terminals & Connections ---
@@ -874,16 +963,27 @@ Identify approved contact systems using this reasoning chain:
       \"H-MTD\" → HMTD
     - Maintain versioning: MLK 1.2 ≠ MLK 2.0
 
-    Examples:
-    \"Approved systems: MQS 0.64 & SLK 2.8 (P/N 345-789)\"
-    → REASONING: [Step1] MQS/SLK explicit → [Step2] Approved → [Step5] Standardized
-    → CONTACT SYSTEMS: MQS 0.64,SLK 2.8
+    **Examples:**
+    - **\"Approved systems: MQS 0.64 & SLK 2.8 (P/N 345-789)\"**
+      → REASONING: [Step1] MQS/SLK explicit → [Step2] Approved → [Step5] Standardized
+      → CONTACT SYSTEMS: **MQS 0.64,SLK 2.8**
+    - **\"Terminals: 927356-1 (MCP 1.5K series)\"**
+      → REASONING: [Step1] Part number → [Step3] Mapped to MCP → [Step2] Implicit approval
+      → CONTACT SYSTEMS: **MCP 1.5K**
+    - **"This housing uses TAB 1.5 terminals."**
+      → REASONING: [Step1] Explicit family mention → [Step5] Standardized
+      → CONTACT SYSTEMS: **TAB 1.5**
+    - **"Compatible with MCON 1.2 terminals."**
+      → REASONING: [Step1] Explicit family mention
+      → CONTACT SYSTEMS: **MCON 1.2**
+    - **"Designed for MLK 1.2 Sm terminals."**
+      → REASONING: [Step1] Explicit family mention
+      → CONTACT SYSTEMS: **MLK 1.2 Sm**
+    - **\"Compatible with various 2.8mm systems\"**
+      → REASONING: [Step1] Vague → [Step5] Non-specific → [Final] NOT FOUND
+      → CONTACT SYSTEMS: **NOT FOUND**
 
-    \"Terminals: 927356-1 (MCP series)\"
-    → REASONING: [Step1] Part number → [Step3] Mapped to MCP → [Step2] Implicit approval
-    → CONTACT SYSTEMS: MCP
-
-    Output format:
+    **Output format:**
     CONTACT SYSTEMS: [system1,system2,...]
 """
 
@@ -919,24 +1019,25 @@ Determine Terminal Position Assurance (TPA) count using this reasoning chain:
     - Implausible counts (e.g., 5 TPAs on 2-cavity connector) → NOT FOUND
 
     STEP 5: DEFAULT HANDLING
-    - No TPA mentions after Step 1? → NOT FOUND
+    - No TPA mentions after Step 1? → Return **None**
     - Assembly required? → 0
 
-    Examples:
-    \"Preassembled dual TPA (P/N TPA2-456)\"
-    → REASONING: [Step1] TPA term + P/N → [Step2] Preassembled → [Step3] Explicit count
-    → TERMINAL POSITION ASSURANCE: 2
+    **Examples:**
+    - **"The connector has no Terminal Position Assurance feature."**
+      → REASONING: [Step1] Explicit denial
+      → TERMINAL POSITION ASSURANCE: **None**
+    - **"The connector is delivered with one TPA."**
+      → REASONING: [Step1] TPA mentioned → [Step3] Explicit count "one"
+      → TERMINAL POSITION ASSURANCE: **1**
+    - **\"Preassembled dual TPA (P/N TPA2-456)\"**
+      → REASONING: [Step1] TPA term + P/N → [Step2] Preassembled → [Step3] Explicit count
+      → TERMINAL POSITION ASSURANCE: **2**
+    - **\"Install TPA-7A during wire harnessing\"**
+      → REASONING: [Step2] Requires assembly → Return 0
+      → TERMINAL POSITION ASSURANCE: **0**
 
-    \"Install TPA-7A during wire harnessing\"
-    → REASONING: [Step2] Requires assembly → Return 0
-    → TERMINAL POSITION ASSURANCE: 0
-
-    \"6-cavity housing with 1 TPA per 3 cavities\"
-    → REASONING: [Step3] 6 ÷ 3 = 2 → Valid
-    → TERMINAL POSITION ASSURANCE: 2
-
-    Output format:
-    TERMINAL POSITION ASSURANCE: [number/0]
+    **Output format:**
+    TERMINAL POSITION ASSURANCE: [number/0/None]
 """
 
 CONNECTOR_POSITION_ASSURANCE_PROMPT = """
@@ -966,22 +1067,20 @@ Determine Connector Position Assurance (CPA) status using this reasoning chain:
       3. Use explicit denials (\"No CPA\") over ambiguous terms
 
     STEP 5: DEFAULT HANDLING
-    - No CPA mentions after Steps 1-3? → **NOT FOUND**
+    - No CPA mentions after Steps 1-3? → **No**
 
-    Examples:
-    \"Includes CPA latch (P/N CPA-456)\"
-    → REASONING: [Step1] Term + P/N → **Yes**
-    → CONNECTOR POSITION ASSURANCE: Yes
+    **Examples:**
+    - **\"Includes CPA latch (P/N CPA-456)\"**
+      → REASONING: [Step1] Term + P/N → **Yes**
+      → CONNECTOR POSITION ASSURANCE: **Yes**
+    - **\"No secondary locking features\"**
+      → REASONING: [Step4] Explicit denial → **No**
+      → CONNECTOR POSITION ASSURANCE: **No**
+    - **\"Secure mating interface\"**
+      → REASONING: [Step1-3] No CPA terms → **No**
+      → CONNECTOR POSITION ASSURANCE: **No**
 
-    \"No secondary locking features\"
-    → REASONING: [Step4] Explicit denial → **No**
-    → CONNECTOR POSITION ASSURANCE: No
-
-    \"Secure mating interface\"
-    → REASONING: [Step1-3] No CPA terms → **NOT FOUND**
-    → CONNECTOR POSITION ASSURANCE: NOT FOUND
-
-    Output format:
+    **Output format:**
     CONNECTOR POSITION ASSURANCE: [Yes/No]
 """
 
@@ -1006,29 +1105,29 @@ Determine closed cavities using this reasoning chain:
       ✓ Mixed open/closed with no numbered closures
 
     STEP 4: AMBIGUITY RESOLUTION
-    - Return `NOT FOUND` for:
+    - Return `none` for:
       ✗ Vague terms (\"some closed cavities\")
       ✗ Contradictory statements
       ✗ Missing cavity status
 
-    Examples:
-    \"Closed cavities: 2,4,6 (see diagram)\"
-    → REASONING: [Step1-2] Explicit numbers → **2,4,6**
-    → NAME OF CLOSED CAVITIES: 2,4,6
+    **Examples:**
+    - **\"All cavities open for wire access\"**
+      → REASONING: [Step3] All open → **none**
+      → NAME OF CLOSED CAVITIES: **none**
+    - **\"Closed cavities: 2,3 (see diagram)\"**
+      → REASONING: [Step1-2] Explicit numbers → **2,3**
+      → NAME OF CLOSED CAVITIES: **2,3**
+    - **\"The following cavities are plugged: 4-7,14-17.\"**
+      → REASONING: [Step1] 'plugged' = closed → [Step2] Explicit ranges found
+      → NAME OF CLOSED CAVITIES: **4-7,14-17**
+    - **\"Positions 4-5,10,14-15,17,19 are blocked from use.\"**
+      → REASONING: [Step1] 'blocked' = closed → [Step2] Explicit numbers and ranges found
+      → NAME OF CLOSED CAVITIES: **4-5,10,14-15,17,19**
+    - **\"Closed cavities unspecified\"**
+      → REASONING: [Step4] Ambiguous → **none**
+      → NAME OF CLOSED CAVITIES: **none**
 
-    \"All cavities open for wire access\"
-    → REASONING: [Step3] All open → **none**
-    → NAME OF CLOSED CAVITIES: none
-
-    \"Positions 3 and 5 are blocked\"
-    → REASONING: [Step1-2] Blocked = closed but unnumbered → **none**
-    → NAME OF CLOSED CAVITIES: none
-
-    \"Closed cavities unspecified\"
-    → REASONING: [Step4] Ambiguous → **none**
-    → NAME OF CLOSED CAVITIES: none
-
-    Output format:
+    **Output format:**
     NAME OF CLOSED CAVITIES: [numbers/none]
 """
 
@@ -1072,20 +1171,18 @@ Determine pre-assembly status using this reasoning chain:
       2. No full disassembly needed
     - Default to NOT FOUND otherwise
 
-    Examples:
-    \"Fully assembled connector; disassemble terminals before wiring\"
-    → REASONING: [Step1] Assembly + disassembly → [Step5] Yes
-    → PRE-ASSEMBLED: Yes
+    **Examples:**
+    - **\"Fully assembled connector; disassemble terminals before wiring\"**
+      → REASONING: [Step1] Assembly + disassembly → [Step5] Yes
+      → PRE-ASSEMBLED: **Yes**
+    - **\"Includes preassembled CPA latch (no disassembly required)\"**
+      → REASONING: [Step2] Component-only → [Step5] No
+      → PRE-ASSEMBLED: **No**
+    - **\"Modular housing with TPA\"**
+      → REASONING: [Step1] No disassembly context → [Step5] Default
+      → PRE-ASSEMBLED: **NOT FOUND**
 
-    \"Includes preassembled CPA latch (no disassembly required)\"
-    → REASONING: [Step2] Component-only → [Step5] No
-    → PRE-ASSEMBLED: No
-
-    \"Modular housing with TPA\"
-    → REASONING: [Step1] No disassembly context → [Step5] Default
-    → PRE-ASSEMBLED: NOT FOUND
-
-    Output format:
+    **Output format:**
     PRE-ASSEMBLED: [Yes/No]
 """
 
@@ -1096,14 +1193,14 @@ Determine the **Type of Connector** using this reasoning chain:
     - Scan for exact terms:
       ✓ \"Standard\"
       ✓ \"Contact Carrier\"
-      ✓ \"Actuator\"
-      ✓ Other documented types (e.g., \"Sensor\", \"Power Distribution\")
+      ✓ \"HSD\", "USB", "HDMI"
+      ✓ "Antenna", "Airbag", "Squib", "IDC", "Bulb holder", "Relay holder"
 
     STEP 2: CONTEXTUAL INFERENCE
     - If no explicit type:
       ✓ Analyze application context:
         * \"Modular contact housing\" → **Contact Carrier**
-        * \"Used in mechanical actuation systems\" → **Actuator**
+        * \"For connecting standard automotive relays\" → **Relay holder**
         * \"General-purpose\" / No special features → **Standard**
       ✓ Map keywords to types:
         * \"Carrier,\" \"module holder\" → Contact Carrier
@@ -1113,32 +1210,41 @@ Determine the **Type of Connector** using this reasoning chain:
     STEP 3: APPLICATION VALIDATION
     - Verify inferred type aligns with:
       ✓ Connector design (e.g., Contact Carriers have modular slots)
-      ✓ System integration described (e.g., Actuators link to moving parts)
-      ✗ Reject mismatches (e.g., \"Actuator\" term in a static assembly)
+      ✓ System integration described
+      ✗ Reject mismatches
 
     STEP 4: DEFAULT RESOLUTION
     - No explicit/inferred type? → **NOT FOUND**
     - Generic connector without specialized use? → **Standard**
 
-    Examples:
-    \"Modular Contact Carrier (P/N CC-234)\"
-    → REASONING: [Step1] Explicit → **Contact Carrier**
-    → TYPE OF CONNECTOR: Contact Carrier
+    **Examples:**
+    - **\"General automotive wiring connector\"**
+      → REASONING: [Step4] Generic → **Standard**
+      → TYPE OF CONNECTOR: **Standard**
+    - **"High-frequency antenna connector."**
+      → REASONING: [Step1] Explicit → **Antenna**
+      → TYPE OF CONNECTOR: **Antenna**
+    - **\"Modular Contact Carrier (P/N CC-234)\"**
+      → REASONING: [Step1] Explicit → **Contact Carrier**
+      → TYPE OF CONNECTOR: **Contact Carrier**
+    - **\"HSD connector for infotainment system.\"**
+      → REASONING: [Step1] Explicit term 'HSD' found
+      → TYPE OF CONNECTOR: **HSD / USB / HDMI**
+    - **"Connector for airbag and squib systems."**
+      → REASONING: [Step1] Explicit → **Airbag / Squib**
+      → TYPE OF CONNECTOR: **Airbag / Squib**
+    - **"Insulation-displacement connector (IDC) for ribbon cable."**
+      → REASONING: [Step1] Explicit → **IDC**
+      → TYPE OF CONNECTOR: **IDC**
+    - **"This is a bulb holder for a T10 lamp."**
+      → REASONING: [Step1] Explicit → **Bulb holder**
+      → TYPE OF CONNECTOR: **Bulb holder**
+    - **"This is a relay holder for standard automotive relays."**
+      → REASONING: [Step2] Application context → **Relay holder**
+      → TYPE OF CONNECTOR: **Relay holder**
 
-    \"Connector for actuator assembly in robotic arm\"
-    → REASONING: [Step2] \"actuator\" context → **Actuator**
-    → TYPE OF CONNECTOR: Actuator
-
-    \"General automotive wiring connector\"
-    → REASONING: [Step4] Generic → **Standard**
-    → TYPE OF CONNECTOR: Standard
-
-    \"High-voltage junction module\"
-    → REASONING: [Step1-2] No matches → [Step4] **NOT FOUND**
-    → TYPE OF CONNECTOR: NOT FOUND
-
-    Output format:
-    TYPE OF CONNECTOR: [Standard/Contact Carrier/Actuator/Other]
+    **Output format:**
+    TYPE OF CONNECTOR: [Type from list]
 """
 
 SET_KIT_PROMPT = """
@@ -1172,24 +1278,21 @@ Determine the **Set/Kit** status using this reasoning chain:
     STEP 5: DEFAULT RESOLUTION
     - Ambiguous part numbers or missing info → **NOT FOUND**
 
-    Examples:
-    \"Connector Set (P/N L-789) includes cover, lever (no assembly required)\"
-    → REASONING: [Step1] Single P/N + accessories → **Yes**
-    → SET/KIT: Yes
+    **Examples:**
+    - **\"Connector Set (P/N L-789) includes cover and lever as loose pieces.\""**
+      → REASONING: [Step4] Explicit "Set" → **Yes**
+      → SET/KIT: **Yes**
+    - **\"Main housing (L-456), Cover (L-457), TPA (L-458)\"**
+      → REASONING: [Step1] Multiple P/Ns for components → **No**
+      → SET/KIT: **No**
+    - **\"Kit with unassembled components (P/N L-999)\"**
+      → REASONING: [Step4] Explicit \"Kit\" → **Yes**
+      → SET/KIT: **Yes**
+    - **\"Connector with accessories (no P/N specified)\"**
+      → REASONING: [Step5] Ambiguous → **NOT FOUND**
+      → SET/KIT: **NOT FOUND**
 
-    \"Main housing (L-456), Cover (L-457), TPA (L-458)\"
-    → REASONING: [Step1] Multiple P/Ns → **No**
-    → SET/KIT: No
-
-    \"Kit with unassembled components (P/N L-999)\"
-    → REASONING: [Step4] Explicit \"Kit\" → **Yes**
-    → SET/KIT: Yes
-
-    \"Connector with accessories (no P/N specified)\"
-    → REASONING: [Step5] Ambiguous → **NOT FOUND**
-    → SET/KIT: NOT FOUND
-
-    Output format:
+    **Output format:**
     SET/KIT: [Yes/No]
 """
 
@@ -1235,26 +1338,25 @@ Determine HV qualification using this reasoning chain:
       ✗ HVAC (non-battery)
 
     STEP 5: FINAL RESOLUTION
-    - Require BOTH:
-      1. Voltage >60V OR explicit HV term
-      2. Explicit HV qualification statement
-    - Edge cases:
-      ✓ 60.1V without HV term → \"No\"
-      ✓ 59V with HV term → \"No\"
+    - For a "Yes" classification, one of these must be true:
+      1. Explicitly stated as "HV-qualified" or similar term.
+      2. Used in an application with voltage > 60V AND designed for that purpose (e.g., orange color, specific HV safety features mentioned).
+    - Otherwise, classify as "No".
 
-    Examples:
-    \"800V battery connector (IEC 62196)\"
-    → REASONING: [Step1] >60V but no HV term → [Step5] Fails dual req → No
-    → HV QUALIFIED: No
+    **Examples:**
+    - **"A 12V standard connector for lighting."**
+      → REASONING: [Step1] Voltage ≤60V → Auto "No"
+      → HV QUALIFIED: **No**
+    - **\"HV-qualified per LV215-1\"**
+      → REASONING: [Step2] Explicit term → [Step5] Valid → Yes
+      → HV QUALIFIED: **Yes**
+    - **"Orange 800V battery connector compliant with IEC 62196."**
+      → REASONING: [Step1] >60V → [Step4] Valid HV context → Yes
+      → HV QUALIFIED: **Yes**
+    - **\"60V hybrid system with HV markings\"**
+      → REASONING: [Step1] 60V → Auto reject
+      → HV QUALIFIED: **No**
 
-    \"HV-qualified per LV215-1\"
-    → REASONING: [Step2] Explicit term → [Step5] Valid → Yes
-    → HV QUALIFIED: Yes
-
-    \"60V hybrid system with HV markings\"
-    → REASONING: [Step1] 60V → Auto reject
-    → HV QUALIFIED: No
-
-    Output format:
+    **Output format:**
     HV QUALIFIED: [Yes/No]
 """
