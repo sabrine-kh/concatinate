@@ -1,3 +1,9 @@
+from loguru import logger
+import sys
+logger.remove()
+logger.add(sys.stderr, level="DEBUG")
+logger.debug("TEST DEBUG LOG: If you see this, DEBUG logging is working.")
+
 # --- Force python to use pysqlite3 based on chromadb docs ---
 __import__('pysqlite3')
 import sys
