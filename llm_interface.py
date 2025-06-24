@@ -519,6 +519,19 @@ Output:
 # --- Helper function to invoke chain and process response (KEEP THIS) ---
 async def _invoke_chain_and_process(chain, input_data, attribute_key):
     """Helper to invoke chain, handle errors, and clean response."""
+    # Log the chunk/context and prompt sent to the LLM
+    context_type = None
+    context_value = None
+    extraction_instructions = None
+    if 'context' in input_data:
+        context_type = 'PDF'
+        context_value = input_data['context'] if isinstance(input_data['context'], str) else str(input_data['context'])
+    elif 'cleaned_web_data' in input_data:
+        context_type = 'Web'
+        context_value = input_data['cleaned_web_data'] if isinstance(input_data['cleaned_web_data'], str) else str(input_data['cleaned_web_data'])
+    if 'extraction_instructions' in input_data:
+        extraction_instructions = input_data['extraction_instructions'] if isinstance(input_data['extraction_instructions'], str) else str(input_data['extraction_instructions'])
+    logger.debug(f"CHUNK SENT TO LLM ({context_type}):\nContext: {context_value[:1000]}\n---\nExtraction Instructions: {extraction_instructions}\n---\nAttribute Key: {attribute_key}")
     response = await chain.ainvoke(input_data)
     log_msg = f"Chain invoked successfully for '{attribute_key}'."
     # Add response length to log for debugging potential truncation/verboseness
