@@ -28,6 +28,173 @@ nest_asyncio.apply()
 st.markdown(
     """<style>
     [data-testid='stSidebarNav'] {display: none;}
+    
+    /* Blue band header styling */
+    .header-band {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
+        color: white;
+        padding: 2rem 0;
+        margin: -1rem -1rem 2rem -1rem;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
+    }
+    
+    .header-band h1 {
+        font-size: 3.5em;
+        margin: 0;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .header-band h2 {
+        font-size: 1.8em;
+        margin: 0.5rem 0 0 0;
+        font-weight: 300;
+        opacity: 0.9;
+    }
+    
+    /* Button styling with blue theme */
+    .stButton > button {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 24px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.2);
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #2a5298 0%, #4a90e2 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.4);
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+    }
+    
+    /* Section headers styling */
+    .section-header {
+        color: #1e3c72;
+        font-size: 2em;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+    
+    /* Info boxes styling */
+    .stAlert {
+        border-left: 4px solid #1e3c72;
+    }
+    
+    /* Success messages styling */
+    .stSuccess {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border: 1px solid #1e3c72;
+    }
+    
+    /* Warning messages styling */
+    .stWarning {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border: 1px solid #1e3c72;
+    }
+    
+    /* Horizontal table styling */
+    .horizontal-table {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .attribute-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #1e3c72;
+        border-radius: 12px;
+        padding: 1rem;
+        min-width: 300px;
+        flex: 1;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .attribute-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2);
+    }
+    
+    .attribute-card h4 {
+        color: #1e3c72;
+        margin: 0 0 0.5rem 0;
+        font-size: 1.1em;
+        font-weight: 600;
+        border-bottom: 2px solid #1e3c72;
+        padding-bottom: 0.5rem;
+    }
+    
+    .attribute-value {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        font-weight: 500;
+    }
+    
+    .attribute-source {
+        font-size: 0.8em;
+        color: #6c757d;
+        font-style: italic;
+        margin-top: 0.5rem;
+    }
+    
+    .success-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+    }
+    
+    .success-true {
+        background-color: #28a745;
+    }
+    
+    .success-false {
+        background-color: #dc3545;
+    }
+    
+    /* Data editor styling */
+    .stDataFrame {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+    }
+    
+    /* Metrics styling */
+    .metric-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #1e3c72;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+    }
+    
+    .metric-value {
+        font-size: 2em;
+        font-weight: bold;
+        color: #1e3c72;
+        margin: 0.5rem 0;
+    }
+    
+    .metric-label {
+        color: #6c757d;
+        font-size: 0.9em;
+        margin-bottom: 0.5rem;
+    }
     </style>""",
     unsafe_allow_html=True
 )
@@ -274,7 +441,15 @@ if embedding_function is None or llm is None:
     st.stop()
 
 # --- UI Layout ---
-st.title("📄 PDF Auto-Extraction with Groq")
+# Blue band header with LEONI
+st.markdown("""
+    <div class="header-band">
+        <h1>LEOPARTS</h1>
+        <h2>LEONI</h2>
+    </div>
+""", unsafe_allow_html=True)
+
+st.markdown("### 📄 PDF Auto-Extraction with Groq")
 st.markdown("Upload PDF documents, process them, and view automatically extracted information.")
 st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}`")
 
@@ -763,6 +938,78 @@ else:
                  "Parse Error": None
             }
         )
+
+        # --- Horizontal Card Layout Display ---
+        st.subheader("📋 Extracted Attributes Overview")
+        
+        # Create horizontal cards for each attribute
+        cards_html = '<div class="horizontal-table">'
+        
+        for _, row in edited_df.iterrows():
+            prompt_name = row['Prompt Name']
+            extracted_value = str(row['Extracted Value'])
+            source = str(row['Source'])
+            is_success = row['Is Success']
+            is_error = row['Is Error']
+            is_not_found = row['Is Not Found']
+            latency = row['Latency (s)']
+            
+            # Determine status color
+            if is_error:
+                status_color = "success-false"
+                status_text = "❌ Error"
+            elif is_not_found:
+                status_color = "success-false"
+                status_text = "🔍 Not Found"
+            elif is_success:
+                status_color = "success-true"
+                status_text = "✅ Success"
+            else:
+                status_color = "success-false"
+                status_text = "⚠️ Unknown"
+            
+            # Truncate long values for display
+            display_value = extracted_value[:50] + "..." if len(extracted_value) > 50 else extracted_value
+            
+            cards_html += f'''
+            <div class="attribute-card">
+                <h4>{prompt_name}</h4>
+                <div class="attribute-value">
+                    <span class="success-indicator {status_color}"></span>
+                    {display_value}
+                </div>
+                <div class="attribute-source">
+                    Source: {source} | Latency: {latency:.2f}s | {status_text}
+                </div>
+            </div>
+            '''
+        
+        cards_html += '</div>'
+        
+        st.markdown(cards_html, unsafe_allow_html=True)
+        
+        # Add a toggle to show/hide the detailed table
+        with st.expander("📊 Show Detailed Table View", expanded=False):
+            st.dataframe(
+                edited_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Prompt Name": st.column_config.TextColumn(width="medium"),
+                    "Extracted Value": st.column_config.TextColumn(width="medium"),
+                    "Ground Truth": st.column_config.TextColumn(width="medium"),
+                    "Source": st.column_config.TextColumn(width="small"),
+                    "Is Success": st.column_config.CheckboxColumn("Success?", width="small"),
+                    "Is Error": st.column_config.CheckboxColumn("Error?", width="small"),
+                    "Is Not Found": st.column_config.CheckboxColumn("Not Found?", width="small"),
+                    "Is Rate Limit": st.column_config.CheckboxColumn("Rate Limit?", width="small"),
+                    "Latency (s)": st.column_config.NumberColumn(format="%.2f", width="small"),
+                    "Exact Match": st.column_config.CheckboxColumn("Exact?", width="small"),
+                    "Case-Insensitive Match": st.column_config.CheckboxColumn("Case-Ins?", width="small"),
+                    "Raw Output": st.column_config.TextColumn("Raw Output", width="large"),
+                    "Parse Error": st.column_config.TextColumn("Parse Error", width="medium")
+                }
+            )
 
         calculate_button = st.button("📊 Calculate Metrics", key="calc_metrics", type="primary")
 
