@@ -937,38 +937,33 @@ else:
             }
         )
 
-        # --- True Horizontal Table Display ---
-        st.subheader("📋 Extracted Attributes Table")
-        # Each attribute as a column, values in a single row
-        horizontal_df = edited_df.set_index("Prompt Name")[["Extracted Value"]].T
-        horizontal_df.index = ["Value"]  # Optional: name the row
-        st.dataframe(horizontal_df, use_container_width=True)
+        # --- Horizontal Card Layout for Each Attribute ---
+        st.subheader("📋 Extracted Attributes Overview")
 
-        # Data editor for ground truth entry (keep for evaluation)
-        with st.expander("✏️ Edit Ground Truth & Evaluate", expanded=False):
-            st.data_editor(
-                edited_df,
-                key="gt_editor_expanded",
-                use_container_width=True,
-                num_rows="dynamic",
-                disabled=disabled_cols,
-                column_order=column_order,
-                column_config={
-                    "Prompt Name": st.column_config.TextColumn(width="medium"),
-                    "Extracted Value": st.column_config.TextColumn(width="medium"),
-                    "Ground Truth": st.column_config.TextColumn(width="medium", help="Enter the correct value here"),
-                    "Source": st.column_config.TextColumn(width="small"),
-                    "Is Success": st.column_config.CheckboxColumn("Success?", width="small"),
-                    "Is Error": st.column_config.CheckboxColumn("Error?", width="small"),
-                    "Is Not Found": st.column_config.CheckboxColumn("Not Found?", width="small"),
-                    "Is Rate Limit": st.column_config.CheckboxColumn("Rate Limit?", width="small"),
-                    "Latency (s)": st.column_config.NumberColumn(format="%.2f", width="small"),
-                    "Exact Match": st.column_config.CheckboxColumn("Exact?", width="small"),
-                    "Case-Insensitive Match": st.column_config.CheckboxColumn("Case-Ins?", width="small"),
-                    "Raw Output": st.column_config.TextColumn("Raw Output", width="large"),
-                    "Parse Error": st.column_config.TextColumn("Parse Error", width="medium")
-                }
-            )
+        cards_html = '<div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0;">'
+
+        for _, row in edited_df.iterrows():
+            prompt_name = row['Prompt Name']
+            extracted_value = str(row['Extracted Value'])
+            cards_html += f'''
+            <div style="
+                background: #f8f9fa;
+                border: 2px solid #1e3c72;
+                border-radius: 12px;
+                padding: 1rem 2rem;
+                min-width: 180px;
+                text-align: center;
+                font-weight: bold;
+                box-shadow: 0 4px 15px rgba(30, 60, 114, 0.08);
+            ">
+                <div style="color: #1e3c72; font-size: 1em; margin-bottom: 0.5em;">{prompt_name}</div>
+                <div style="font-size: 1.2em;">{extracted_value}</div>
+            </div>
+            '''
+
+        cards_html += '</div>'
+
+        st.markdown(cards_html, unsafe_allow_html=True)
 
         calculate_button = st.button("📊 Calculate Metrics", key="calc_metrics", type="primary")
 
