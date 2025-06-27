@@ -1001,6 +1001,58 @@ If no system is found, return:
 CONTACT SYSTEMS: not found
 """
 
+TERMINAL_POSITION_ASSURANCE_PROMPT = """
+Determine Terminal Position Assurance (TPA) count using this reasoning chain:
+
+    STEP 1: TPA IDENTIFICATION
+    - Scan documents for:
+      ✓ Explicit terms: \"TPA\", \"Terminal Position Assurance\", \"Anti-Backout\"
+      ✓ Part numbers with TPA identifiers (e.g., \"-TPA1\", \"-2T\")
+      ✓ Assembly diagrams showing TPA components
+
+    STEP 2: PREASSEMBLY STATUS CHECK
+    - Verify if TPA is **delivered preinstalled**:
+      ✓ \"Preassembled TPA\"
+      ✓ \"Included with housing\"
+      ✗ \"Assemble TPA during production\" → Return 0
+
+    STEP 3: COUNT RESOLUTION
+    - For preassembled TPAs:
+      1. Direct count: \"Dual TPAs\" → 2
+      2. Position-based inference:
+         * \"1 TPA per 12 cavities\" → Total = Cavities ÷ 12
+         * Single-position connector → Default 1
+    - For multiple TPAs:
+      ✓ Sum explicitly stated numbers
+      ✓ Reject ambiguous terms (\"Multiple TPAs\" → NOT FOUND)
+
+    STEP 4: VALIDATION
+    - Confirm TPA count aligns with:
+      ✓ Physical connector size/cavities
+      ✓ Manufacturer specifications
+    - Implausible counts (e.g., 5 TPAs on 2-cavity connector) → NOT FOUND
+
+    STEP 5: DEFAULT HANDLING
+    - No TPA mentions after Step 1? → Return **None**
+    - Assembly required? → 0
+
+    **Examples:**
+    - **"The connector has no Terminal Position Assurance feature."**
+      → REASONING: [Step1] Explicit denial
+      → TERMINAL POSITION ASSURANCE: **None**
+    - **"The connector is delivered with one TPA."**
+      → REASONING: [Step1] TPA mentioned → [Step3] Explicit count "one"
+      → TERMINAL POSITION ASSURANCE: **1**
+    - **\"Preassembled dual TPA (P/N TPA2-456)\"**
+      → REASONING: [Step1] TPA term + P/N → [Step2] Preassembled → [Step3] Explicit count
+      → TERMINAL POSITION ASSURANCE: **2**
+    - **\"Install TPA-7A during wire harnessing\"**
+      → REASONING: [Step2] Requires assembly → Return 0
+      → TERMINAL POSITION ASSURANCE: **0**
+
+    **Output format:**
+    TERMINAL POSITION ASSURANCE: [number/0/None]
+"""
 
 CONNECTOR_POSITION_ASSURANCE_PROMPT = """
 Determine Connector Position Assurance (CPA) status using this reasoning chain:

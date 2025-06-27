@@ -12,11 +12,51 @@ import fitz  # PyMuPDF
 from mistralai.client import MistralClient
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+import json
+import difflib
 
 import config
 
 # Global thread pool for PDF processing
 pdf_thread_pool = ThreadPoolExecutor(max_workers=2)  # Adjust based on your needs
+
+# --- Load Attribute Dictionary ---
+ATTRIBUTE_DICTIONARY_PATH = os.getenv("ATTRIBUTE_DICTIONARY_PATH", "attribute_dictionary.json")
+try:
+    with open(ATTRIBUTE_DICTIONARY_PATH, "r", encoding="utf-8") as f:
+        ATTRIBUTE_DICTIONARY = json.load(f)
+except Exception as e:
+    logger.warning(f"Could not load attribute dictionary: {e}")
+    ATTRIBUTE_DICTIONARY = {}
+
+# --- Build Regexes for Each Attribute ---
+def build_attribute_regexes(attribute_dict):
+    regexes = {}
+    for attr, values in attribute_dict.items():
+        clean_values = [re.escape(v) for v in values if v]
+        if not clean_values:
+            continue
+        pattern = r'(' + '|'.join(clean_values) + r')'
+        regexes[attr] = re.compile(pattern, re.IGNORECASE)
+    return regexes
+
+ATTRIBUTE_REGEXES = build_attribute_regexes(ATTRIBUTE_DICTIONARY)
+
+# --- Tagging Utility ---
+def tag_chunk_with_dictionary(chunk_text, attribute_regexes):
+    tags = {}
+    for attr, regex in attribute_regexes.items():
+        matches = regex.findall(chunk_text)
+        tags[attr] = list({m.strip() for m in matches})
+    return tags
+
+# --- Canonicalization Utility ---
+def canonicalise(raw, attr_key):
+    canonicals = ATTRIBUTE_DICTIONARY.get(attr_key, [])
+    if not canonicals:
+        return raw
+    match = difflib.get_close_matches(str(raw), canonicals, n=1, cutoff=0.6)
+    return match[0] if match else raw
 
 def encode_pil_image(pil_image: Image.Image, format: str = "PNG") -> Tuple[str, str]:
     """Encode PIL Image to Base64 string."""
@@ -120,6 +160,8 @@ Output only the generated Markdown content.
                 page_content = chat_response.choices[0].message.content
                 
                 if page_content:
+                    # --- Tag the chunk with dictionary matches ---
+                    chunk_tags = tag_chunk_with_dictionary(page_content, ATTRIBUTE_REGEXES)
                     # Log the extracted content
                     logger.info("\nExtracted Content:")
                     logger.debug("-" * 40)
@@ -131,7 +173,8 @@ Output only the generated Markdown content.
                         page_content=page_content,
                         metadata={
                             'source': file_basename,
-                            'page': page_num + 1
+                            'page': page_num + 1,
+                            **chunk_tags  # Add all attribute tags to metadata
                         }
                     )
                     all_docs.append(chunk_doc)
@@ -254,3 +297,18 @@ async def process_uploaded_pdfs(uploaded_files: List[BinaryIO], temp_dir: str = 
 def process_pdfs_in_background(uploaded_files: List[BinaryIO], temp_dir: str = "temp_pdf") -> asyncio.Task[List[Document]]:
     """Start PDF processing in the background and return a task that can be awaited later."""
     return asyncio.create_task(process_uploaded_pdfs(uploaded_files, temp_dir))
+
+def fetch_chunks(retriever, part_number, attr_key, k=8):
+    """
+    Tag-aware retrieval: returns only chunks that match the part_number and have a non-empty tag for attr_key.
+    """
+    dense_results = retriever.similarity_search(attr_key, k=k)
+    filtered = [
+        chunk for chunk in dense_results
+        if (
+            (not part_number or str(chunk.metadata.get("part_number", "")).strip() == str(part_number).strip())
+            and chunk.metadata.get(attr_key)
+            and len(chunk.metadata[attr_key]) > 0
+        )
+    ]
+    return filtered
