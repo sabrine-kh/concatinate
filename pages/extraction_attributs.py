@@ -633,30 +633,29 @@ else:
                 try:
                     string_to_parse = raw_output.strip()
                     parsed_json = json.loads(string_to_parse)
-                    if isinstance(parsed_json, dict):
-                        if attribute_key in parsed_json:
-                            final_answer_value = str(parsed_json[attribute_key]) # Store final PDF result
-                            logger.success(f"Stage 2 successful for '{attribute_key}' from PDF data.")
-                        elif "error" in parsed_json:
-                            error_msg = parsed_json['error']
-                            llm_returned_error_msg = error_msg
-                            if "rate limit" in error_msg.lower():
-                                final_answer_value = "Rate Limit Hit"
-                                is_rate_limit = True
-                                parse_error = ValueError("Rate limit hit (PDF)")
-                            else:
-                                final_answer_value = f"Error: {error_msg[:100]}"
-                                parse_error = ValueError(f"Stage 2 Error: {error_msg}")
-                            logger.warning(f"Stage 2 Error for '{attribute_key}' from PDF. Error: {error_msg}")
+                    if not isinstance(parsed_json, dict):
+                        logger.error(f"Stage 2: Parsed JSON is not a dict for '{attribute_key}'. Got: {parsed_json}")
+                        final_answer_value = "Unexpected JSON Type"
+                        parse_error = TypeError(f"Stage 2 Expected dict, got {type(parsed_json)}")
+                        logger.warning(f"Stage 2 Unexpected JSON type for '{attribute_key}'.")
+                    elif attribute_key in parsed_json:
+                        final_answer_value = str(parsed_json[attribute_key]) # Store final PDF result
+                        logger.success(f"Stage 2 successful for '{attribute_key}' from PDF data.")
+                    elif "error" in parsed_json:
+                        error_msg = parsed_json['error']
+                        llm_returned_error_msg = error_msg
+                        if "rate limit" in error_msg.lower():
+                            final_answer_value = "Rate Limit Hit"
+                            is_rate_limit = True
+                            parse_error = ValueError("Rate limit hit (PDF)")
                         else:
-                             final_answer_value = "Unexpected JSON Format"
-                             parse_error = ValueError(f"Stage 2 Unexpected JSON keys: {list(parsed_json.keys())}")
-                             logger.warning(f"Stage 2 Unexpected JSON for '{attribute_key}'.")
+                            final_answer_value = f"Error: {error_msg[:100]}"
+                            parse_error = ValueError(f"Stage 2 Error: {error_msg}")
+                        logger.warning(f"Stage 2 Error for '{attribute_key}' from PDF. Error: {error_msg}")
                     else:
-                         final_answer_value = "Unexpected JSON Type"
-                         parse_error = TypeError(f"Stage 2 Expected dict, got {type(parsed_json)}")
-                         logger.warning(f"Stage 2 Unexpected JSON type for '{attribute_key}'.")
-                         
+                        final_answer_value = "Unexpected JSON Format"
+                        parse_error = ValueError(f"Stage 2 Unexpected JSON keys: {list(parsed_json.keys())}")
+                        logger.warning(f"Stage 2 Unexpected JSON for '{attribute_key}'.")
                 except json.JSONDecodeError as json_err:
                     parse_error = json_err
                     final_answer_value = "Invalid JSON Response"

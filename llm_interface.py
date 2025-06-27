@@ -533,57 +533,16 @@ async def _invoke_chain_and_process(chain, input_data, attribute_key):
         extraction_instructions = input_data['extraction_instructions'] if isinstance(input_data['extraction_instructions'], str) else str(input_data['extraction_instructions'])
     logger.debug(f"CHUNK SENT TO LLM ({context_type}):\nContext: {context_value[:1000]}\n---\nExtraction Instructions: {extraction_instructions}\n---\nAttribute Key: {attribute_key}")
     response = await chain.ainvoke(input_data)
+    if response is None or not isinstance(response, str) or not response.strip():
+        logger.error(f"Chain invocation returned None or empty for '{attribute_key}'")
+        return json.dumps({"error": f"Chain invocation returned None or empty for {attribute_key}"})
     log_msg = f"Chain invoked successfully for '{attribute_key}'."
     # Add response length to log for debugging potential truncation/verboseness
     if response:
          log_msg += f" Response length: {len(response)}"
     logger.info(log_msg)
 
-    if response is None:
-         logger.error(f"Chain invocation returned None for '{attribute_key}'")
-         return json.dumps({"error": f"Chain invocation returned None for {attribute_key}"})
-
-    # --- Enhanced Cleaning --- 
-    cleaned_response = response
-    
-    # 1. Remove <think> tags (already handled)
-    think_start_tag = "<think>"
-    think_end_tag = "</think>"
-    start_index_think = cleaned_response.find(think_start_tag)
-    end_index_think = cleaned_response.find(think_end_tag)
-    if start_index_think != -1 and end_index_think != -1 and end_index_think > start_index_think:
-         cleaned_response = cleaned_response[end_index_think + len(think_end_tag):].strip()
-
-    # 2. Remove ```json ... ``` markdown (already handled)
-    if cleaned_response.strip().startswith("```json"):
-        cleaned_response = cleaned_response.strip()[7:]
-        if cleaned_response.endswith("```"):
-            cleaned_response = cleaned_response[:-3]
-        cleaned_response = cleaned_response.strip()
-
-    # 3. Find the first '{' and the last '}' to isolate the JSON object
-    try:
-        first_brace = cleaned_response.find('{')
-        last_brace = cleaned_response.rfind('}')
-        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            potential_json = cleaned_response[first_brace : last_brace + 1]
-            # Attempt to parse the isolated part
-            json.loads(potential_json) # Test if it's valid JSON
-            cleaned_response = potential_json # If valid, use this isolated part
-            logger.debug(f"Isolated potential JSON for '{attribute_key}': {cleaned_response}")
-        else:
-             logger.warning(f"Could not find clear JSON braces {{...}} in response for '{attribute_key}'. Using original cleaned response.")
-    except json.JSONDecodeError:
-        logger.warning(f"Failed to parse isolated JSON for '{attribute_key}'. Using original cleaned response. Raw: {cleaned_response}")
-        # If parsing the isolated part fails, fall back to the previously cleaned response
-        pass 
-    except Exception as e:
-         logger.error(f"Unexpected error during JSON isolation for '{attribute_key}': {e}")
-         # Fallback
-         pass
-    # --- End Enhanced Cleaning ---
-
-    return cleaned_response # Validation happens in the caller (app.py now)
+    return response # Validation happens in the caller (app.py now)
 
 
 # --- REMOVE Unified Chain and Old run_extraction ---
