@@ -25,7 +25,7 @@ st.markdown(
     <style>
     [data-testid='stSidebarNav'] {display: none;}
     
-    /* Sidebar blue gradient */
+    /* Sidebar white gradient */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%) !important;
     }
