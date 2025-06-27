@@ -937,11 +937,12 @@ else:
             }
         )
 
-        # --- Horizontal Table Display ---
+        # --- True Horizontal Table Display ---
         st.subheader("📋 Extracted Attributes Table")
-        # Transpose the table: attribute names as rows, extracted value as column
-        transposed_df = edited_df.set_index("Prompt Name")[["Extracted Value"]].rename(columns={"Extracted Value": "Value"})
-        st.dataframe(transposed_df, use_container_width=True)
+        # Each attribute as a column, values in a single row
+        horizontal_df = edited_df.set_index("Prompt Name")[["Extracted Value"]].T
+        horizontal_df.index = ["Value"]  # Optional: name the row
+        st.dataframe(horizontal_df, use_container_width=True)
 
         # Data editor for ground truth entry (keep for evaluation)
         with st.expander("✏️ Edit Ground Truth & Evaluate", expanded=False):
