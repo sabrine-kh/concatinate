@@ -20,6 +20,7 @@ import asyncio
 import subprocess
 import nest_asyncio
 from typing import List
+import re
 
 nest_asyncio.apply()
 
@@ -491,54 +492,43 @@ else:
                 needs_fallback = False
                 
                 try:
-                    # Minimal cleaning, rely on helper's cleaning primarily
                     string_to_parse = raw_output.strip()
-                    parsed_json = json.loads(string_to_parse)
-                    
-                    if isinstance(parsed_json, dict):
-                        if attribute_key in parsed_json:
-                             parsed_value = str(parsed_json[attribute_key])
-                             # Check for NOT FOUND variants 
-                             if "not found" in parsed_value.lower() or parsed_value.strip() == "":
-                                 final_answer_value = "NOT FOUND"
-                                 needs_fallback = True # Mark for PDF stage
-                                 logger.info(f"Stage 1 result for '{attribute_key}' is NOT FOUND. Queued for PDF fallback.")
-                             else:
-                                 final_answer_value = parsed_value # Store successful web result
-                                 logger.success(f"Stage 1 successful for '{attribute_key}' from Web data.")
-                        elif "error" in parsed_json:
-                            # Handle errors from the web chain call
-                            error_msg = parsed_json['error']
-                            llm_returned_error_msg = error_msg
-                            if "rate limit" in error_msg.lower():
-                                final_answer_value = "Rate Limit Hit"
-                                is_rate_limit = True
-                                parse_error = ValueError("Rate limit hit (Web)")
-                            else:
-                                final_answer_value = f"Error: {error_msg[:100]}"
-                                parse_error = ValueError(f"Stage 1 Error: {error_msg}")
-                            needs_fallback = True # Also fallback on web chain error
-                            logger.warning(f"Stage 1 Error for '{attribute_key}'. Queued for PDF fallback. Error: {error_msg}")
-                        else:
-                             final_answer_value = "Unexpected JSON Format"
-                             parse_error = ValueError(f"Stage 1 Unexpected JSON keys: {list(parsed_json.keys())}")
-                             needs_fallback = True # Fallback on unexpected format
-                    else:
+                    parsed_json = extract_json_from_string(string_to_parse)
+                    if not isinstance(parsed_json, dict):
+                        logger.error(f"Stage 1: Parsed JSON is not a dict for '{attribute_key}'. Got: {parsed_json}. Raw: {string_to_parse}")
                         final_answer_value = "Unexpected JSON Type"
                         parse_error = TypeError(f"Stage 1 Expected dict, got {type(parsed_json)}")
-                        needs_fallback = True # Fallback
-                        logger.warning(f"Stage 1 Unexpected JSON type '{attribute_key}'. Queued for PDF fallback.")
-                        
-                except json.JSONDecodeError as json_err:
-                    parse_error = json_err
-                    final_answer_value = "Invalid JSON Response"
-                    logger.error(f"Failed to parse Stage 1 JSON for '{attribute_key}'. Error: {json_err}. String: '{string_to_parse}'")
-                    needs_fallback = True # Fallback on bad JSON
+                        needs_fallback = True
+                    elif attribute_key in parsed_json:
+                        parsed_value = str(parsed_json[attribute_key])
+                        # Check for NOT FOUND variants 
+                        if "not found" in parsed_value.lower() or parsed_value.strip() == "":
+                            final_answer_value = "NOT FOUND"
+                            needs_fallback = True # Mark for PDF stage
+                            logger.info(f"Stage 1 result for '{attribute_key}' is NOT FOUND. Queued for PDF fallback.")
+                        else:
+                            final_answer_value = parsed_value # Store successful web result
+                            logger.success(f"Stage 1 successful for '{attribute_key}' from Web data.")
+                    elif "error" in parsed_json:
+                        error_msg = parsed_json['error']
+                        llm_returned_error_msg = error_msg
+                        if "rate limit" in error_msg.lower():
+                            final_answer_value = "Rate Limit Hit"
+                            is_rate_limit = True
+                            parse_error = ValueError("Rate limit hit (Web)")
+                        else:
+                            final_answer_value = f"Error: {error_msg[:100]}"
+                            parse_error = ValueError(f"Stage 1 Error: {error_msg}")
+                        needs_fallback = True # Also fallback on web chain error
+                        logger.warning(f"Stage 1 Error for '{attribute_key}'. Queued for PDF fallback. Error: {error_msg}")
+                    else:
+                        final_answer_value = "Unexpected JSON Format"
+                        parse_error = ValueError(f"Stage 1 Unexpected JSON keys: {list(parsed_json.keys())}")
+                        needs_fallback = True # Fallback on unexpected format
                 except Exception as processing_exc:
                     parse_error = processing_exc
                     final_answer_value = "Processing Error"
-                    logger.error(f"Error processing Stage 1 result for '{attribute_key}'. Error: {processing_exc}")
-                    needs_fallback = True # Fallback
+                    logger.error(f"Error processing Stage 1 result for '{attribute_key}'. Error: {processing_exc}. Raw: {string_to_parse}")
                 
                 # Store intermediate result (even if NOT FOUND or error)
                 is_error = bool(parse_error) and not is_rate_limit
@@ -632,9 +622,9 @@ else:
                 
                 try:
                     string_to_parse = raw_output.strip()
-                    parsed_json = json.loads(string_to_parse)
+                    parsed_json = extract_json_from_string(string_to_parse)
                     if not isinstance(parsed_json, dict):
-                        logger.error(f"Stage 2: Parsed JSON is not a dict for '{attribute_key}'. Got: {parsed_json}")
+                        logger.error(f"Stage 2: Parsed JSON is not a dict for '{attribute_key}'. Got: {parsed_json}. Raw: {string_to_parse}")
                         final_answer_value = "Unexpected JSON Type"
                         parse_error = TypeError(f"Stage 2 Expected dict, got {type(parsed_json)}")
                         logger.warning(f"Stage 2 Unexpected JSON type for '{attribute_key}'.")
@@ -656,14 +646,10 @@ else:
                         final_answer_value = "Unexpected JSON Format"
                         parse_error = ValueError(f"Stage 2 Unexpected JSON keys: {list(parsed_json.keys())}")
                         logger.warning(f"Stage 2 Unexpected JSON for '{attribute_key}'.")
-                except json.JSONDecodeError as json_err:
-                    parse_error = json_err
-                    final_answer_value = "Invalid JSON Response"
-                    logger.error(f"Failed to parse Stage 2 JSON for '{attribute_key}'. Error: {json_err}. String: '{string_to_parse}'")
                 except Exception as processing_exc:
                     parse_error = processing_exc
                     final_answer_value = "Processing Error"
-                    logger.error(f"Error processing Stage 2 result for '{attribute_key}'. Error: {processing_exc}")
+                    logger.error(f"Error processing Stage 2 result for '{attribute_key}'. Error: {processing_exc}. Raw: {string_to_parse}")
 
                 # --- Update the result in intermediate_results with Stage 2 data --- 
                 is_error = bool(parse_error) and not is_rate_limit
@@ -938,4 +924,20 @@ else:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
     
 
-# REMOVE the previous Q&A section entirely (already done)
+def extract_json_from_string(s):
+    """
+    Extracts the first valid JSON object from a string.
+    Returns the parsed dict, or None if not found.
+    """
+    if not s or not isinstance(s, str):
+        return None
+    # Remove <think>...</think> blocks
+    s = re.sub(r'<think>.*?</think>', '', s, flags=re.DOTALL)
+    # Find the first {...} block
+    match = re.search(r'\{.*\}', s, flags=re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except Exception:
+            return None
+    return None
