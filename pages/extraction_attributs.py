@@ -444,8 +444,7 @@ if embedding_function is None or llm is None:
 # Blue band header with LEONI
 st.markdown("""
     <div class="header-band">
-        <h1>LEOPARTS</h1>
-        <h2>LEONI</h2>
+        <h1>LEONI</h1>
     </div>
 """, unsafe_allow_html=True)
 
