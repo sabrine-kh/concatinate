@@ -927,79 +927,65 @@ According to their qualification for usage under different environmental conditi
 CONTACT_SYSTEMS_PROMPT = """
 Identify approved contact systems using this reasoning chain:
 
-STEP 1: SOURCE IDENTIFICATION
-- Scan for:
-  ✓ Explicit system families (MQS, MLK, SLK, MCP, MCON, TAB, etc.)
-  ✓ Terminal part numbers (e.g., 123-4567, XW3D-XXXX-XX)
-  ✓ Manufacturer approval statements:
-    * "Approved for use with..."
-    * "Compatible contact systems:"
-    * "Recommended mating system"
+    STEP 1: SOURCE IDENTIFICATION
+    - Scan for:
+      ✓ Explicit system families (MQS, MLK, SLK, etc.)
+      ✓ Terminal part numbers (123-4567, XW3D-XXXX-XX)
+      ✓ Manufacturer approval statements:
+        * \"Approved for use with...\"
+        * \"Compatible contact systems:\"
+        * \"Recommended mating system\"
 
-STEP 1.5: LAYOUT-BASED INFERENCE
-- If a contact system (e.g., MCP 2.5) appears in the same section, header, or table as a part number or drawing title, and no other systems are mentioned, assume it is the approved system.
-- Example:
-    Drawing Title: Plug Assembly, Sealed, 1 Posn  
-    Part Number: 2098198-5  
-    MCP 2.5 
-  → CONTACT SYSTEMS: mcp 2.5
+    STEP 2: MANUFACTURER PRIORITIZATION
+    - Verify mentions are supplier-specified:
+      ✓ Direct manufacturer recommendations
+      ✗ Customer-specific part numbers
+      ✗ Generic terminal references
 
-STEP 2: MANUFACTURER PRIORITIZATION
-- Verify the mention is supplier-specified:
-  ✓ Direct manufacturer recommendations
-  ✗ Customer-specific part numbers
-  ✗ Generic or vague references like “2.8mm systems”
+    STEP 3: SYSTEM RESOLUTION HIERARCHY
+    1. Primary: Explicit family mentions (MQS 0.64)
+    2. Secondary: Part number mapping:
+       - Cross-reference with manufacturer catalogs
+       - Match patterns (e.g., 928321-1 → TE MCP 1.2)
+    3. Reject unidentifiable part numbers
 
-STEP 3: SYSTEM RESOLUTION HIERARCHY
-1. Primary: Explicit family mentions (e.g., MQS 0.64)
-2. Secondary: Terminal part number mapping:
-   - Cross-reference against known manufacturer catalogs
-   - Example: 928321-1 → TE MCP 1.2
-3. Reject unidentifiable or uncatalogued part numbers
+    STEP 4: MULTI-SYSTEM VALIDATION
+    - Check for:
+      ✓ Multiple approval statements
+      ✓ Hybrid connector systems
+      ✓ Generation variants (MQS Gen2 vs Gen3)
+    - Require explicit documentation for each system
 
-STEP 4: MULTI-SYSTEM VALIDATION
-- Accept multiple systems only if:
-  ✓ Clearly documented
-  ✓ Hybrid terminal system is described
-  ✓ Variants (e.g., MQS Gen2 vs Gen3) are explicitly listed
+    STEP 5: STANDARDIZATION CHECK
+    - Convert to manufacturer nomenclature:
+      \"Micro Quadlock\" → MQS
+      \"H-MTD\" → HMTD
+    - Maintain versioning: MLK 1.2 ≠ MLK 2.0
 
-STEP 5: STANDARDIZATION CHECK
-- Normalize naming:
-  "Micro Quadlock" → MQS  
-  "H-MTD" → HMTD  
-- Maintain system distinctions:
-  MLK 1.2 ≠ MLK 2.0
+    **Examples:**
+    - **\"Approved systems: MQS 0.64 & SLK 2.8 (P/N 345-789)\"**
+      → REASONING: [Step1] MQS/SLK explicit → [Step2] Approved → [Step5] Standardized
+      → CONTACT SYSTEMS: **MQS 0.64,SLK 2.8**
+    - **\"Terminals: 927356-1 (MCP 1.5K series)\"**
+      → REASONING: [Step1] Part number → [Step3] Mapped to MCP → [Step2] Implicit approval
+      → CONTACT SYSTEMS: **MCP 1.5K**
+    - **"This housing uses TAB 1.5 terminals."**
+      → REASONING: [Step1] Explicit family mention → [Step5] Standardized
+      → CONTACT SYSTEMS: **TAB 1.5**
+    - **"Compatible with MCON 1.2 terminals."**
+      → REASONING: [Step1] Explicit family mention
+      → CONTACT SYSTEMS: **MCON 1.2**
+    - **"Designed for MLK 1.2 Sm terminals."**
+      → REASONING: [Step1] Explicit family mention
+      → CONTACT SYSTEMS: **MLK 1.2 Sm**
+    - **\"Compatible with various 2.8mm systems\"**
+      → REASONING: [Step1] Vague → [Step5] Non-specific → [Final] NOT FOUND
+      → CONTACT SYSTEMS: **NOT FOUND**
 
-**Examples:**
-- "Approved systems: MQS 0.64 & SLK 2.8 (P/N 345-789)"
-  → REASONING: [Step1] MQS/SLK explicit → [Step2] Approved → [Step5] Standardized
-  → CONTACT SYSTEMS: mqs 0.64, slk 2.8
-
-- "Terminals: 927356-1 (MCP 1.5K series)"
-  → REASONING: [Step1] Part number → [Step3] Mapped to MCP → [Step2] Implicit approval
-  → CONTACT SYSTEMS: mcp 1.5k
-
-- "This housing uses TAB 1.5 terminals."
-  → REASONING: [Step1] Explicit family mention → [Step5] Standardized
-  → CONTACT SYSTEMS: tab 1.5
-
-- "Compatible with MCON 1.2 terminals."
-  → REASONING: [Step1] Explicit family mention
-  → CONTACT SYSTEMS: mcon 1.2
-
-- "Designed for MLK 1.2 Sm terminals."
-  → REASONING: [Step1] Explicit family mention
-  → CONTACT SYSTEMS: mlk 1.2 sm
-
-- "Compatible with various 2.8mm systems"
-  → REASONING: [Step1] Vague → [Step5] Non-specific → [Final] NOT FOUND
-  → CONTACT SYSTEMS: not found
-
-**Output format:**
-CONTACT SYSTEMS: system1, system2
-If no system is found, return:
-CONTACT SYSTEMS: not found
+    **Output format:**
+    CONTACT SYSTEMS: [system1,system2,...]
 """
+
 
 TERMINAL_POSITION_ASSURANCE_PROMPT = """
 Determine Terminal Position Assurance (TPA) count using this reasoning chain:

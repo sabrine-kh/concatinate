@@ -26,6 +26,71 @@ def main():
     st.markdown(
         """<style>
         [data-testid="stSidebarNav"] {display: none;}
+        
+        /* Blue band header styling */
+        .header-band {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin: -1rem -1rem 2rem -1rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
+        }
+        
+        .header-band h1 {
+            font-size: 3.5em;
+            margin: 0;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header-band h2 {
+            font-size: 1.8em;
+            margin: 0.5rem 0 0 0;
+            font-weight: 300;
+            opacity: 0.9;
+        }
+        
+        /* Button styling with blue theme */
+        .stButton > button {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 24px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(30, 60, 114, 0.2);
+        }
+        
+        .stButton > button:hover {
+            background: linear-gradient(135deg, #2a5298 0%, #4a90e2 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(30, 60, 114, 0.4);
+        }
+        
+        /* Sidebar styling */
+        .css-1d391kg {
+            background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+        }
+        
+        /* Welcome section styling */
+        .welcome-section {
+            text-align: center;
+            padding: 3rem 0;
+        }
+        
+        .welcome-section h2 {
+            color: #1e3c72;
+            font-size: 2.5em;
+            margin-bottom: 1rem;
+        }
+        
+        .welcome-section p {
+            color: #2a5298;
+            font-size: 1.3em;
+            margin-bottom: 2rem;
+        }
         </style>""",
         unsafe_allow_html=True
     )
@@ -37,13 +102,23 @@ def main():
             st.switch_page("pages/chatbot.py")
         if st.button("📄 Extract a new Part"):
             st.switch_page("pages/extraction_attributs.py")
+    
+    # Blue band header with LEONI
     st.markdown("""
-        <div style='display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;'>
-            <h1 style='font-size: 3em; margin-bottom: 0.2em;'>LEOPARTS</h1>
-            <h2 style='font-size: 2em; margin-bottom: 0.5em;'>Welcome!</h2>
-            <p style='font-size: 1.5em; margin-bottom: 2em;'>Choose a Tool</p>
+        <div class="header-band">
+            <h1>LEOPARTS</h1>
+            <h2>LEONI</h2>
         </div>
     """, unsafe_allow_html=True)
+    
+    # Welcome section
+    st.markdown("""
+        <div class="welcome-section">
+            <h2>Welcome!</h2>
+            <p>Choose a Tool</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([2, 3, 2])
     with col2:
         c1, c2 = st.columns(2)
