@@ -448,9 +448,8 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-st.markdown("### 📄 PDF Auto-Extraction with Groq")
-st.markdown("Upload PDF documents, process them, and view automatically extracted information.")
-st.markdown(f"**Model:** `{config.LLM_MODEL_NAME}` | **Embeddings:** `{config.EMBEDDING_MODEL_NAME}`")
+st.markdown("### 📄 PDF Attribute Extraction")
+st.markdown("Upload your PDF documents and automatically extract key attributes.")
 
 if not config.GROQ_API_KEY:
     st.warning("Groq API Key not found. Please set the GROQ_API_KEY environment variable.", icon="⚠️")
@@ -938,65 +937,25 @@ else:
             }
         )
 
-        # --- Horizontal Card Layout Display ---
-        st.subheader("📋 Extracted Attributes Overview")
-        
-        # Create horizontal cards for each attribute
-        cards_html = '<div class="horizontal-table">'
-        
-        for _, row in edited_df.iterrows():
-            prompt_name = row['Prompt Name']
-            extracted_value = str(row['Extracted Value'])
-            source = str(row['Source'])
-            is_success = row['Is Success']
-            is_error = row['Is Error']
-            is_not_found = row['Is Not Found']
-            latency = row['Latency (s)']
-            
-            # Determine status color
-            if is_error:
-                status_color = "success-false"
-                status_text = "❌ Error"
-            elif is_not_found:
-                status_color = "success-false"
-                status_text = "🔍 Not Found"
-            elif is_success:
-                status_color = "success-true"
-                status_text = "✅ Success"
-            else:
-                status_color = "success-false"
-                status_text = "⚠️ Unknown"
-            
-            # Truncate long values for display
-            display_value = extracted_value[:50] + "..." if len(extracted_value) > 50 else extracted_value
-            
-            cards_html += f'''
-            <div class="attribute-card">
-                <h4>{prompt_name}</h4>
-                <div class="attribute-value">
-                    <span class="success-indicator {status_color}"></span>
-                    {display_value}
-                </div>
-                <div class="attribute-source">
-                    Source: {source} | Latency: {latency:.2f}s | {status_text}
-                </div>
-            </div>
-            '''
-        
-        cards_html += '</div>'
-        
-        st.markdown(cards_html, unsafe_allow_html=True)
-        
-        # Add a toggle to show/hide the detailed table
-        with st.expander("📊 Show Detailed Table View", expanded=False):
-            st.dataframe(
+        # --- Horizontal Table Display ---
+        st.subheader("📋 Extracted Attributes Table")
+        # Transpose the table: attribute names as rows, extracted value as column
+        transposed_df = edited_df.set_index("Prompt Name")[["Extracted Value"]].rename(columns={"Extracted Value": "Value"})
+        st.dataframe(transposed_df, use_container_width=True)
+
+        # Data editor for ground truth entry (keep for evaluation)
+        with st.expander("✏️ Edit Ground Truth & Evaluate", expanded=False):
+            st.data_editor(
                 edited_df,
+                key="gt_editor_expanded",
                 use_container_width=True,
-                hide_index=True,
+                num_rows="dynamic",
+                disabled=disabled_cols,
+                column_order=column_order,
                 column_config={
                     "Prompt Name": st.column_config.TextColumn(width="medium"),
                     "Extracted Value": st.column_config.TextColumn(width="medium"),
-                    "Ground Truth": st.column_config.TextColumn(width="medium"),
+                    "Ground Truth": st.column_config.TextColumn(width="medium", help="Enter the correct value here"),
                     "Source": st.column_config.TextColumn(width="small"),
                     "Is Success": st.column_config.CheckboxColumn("Success?", width="small"),
                     "Is Error": st.column_config.CheckboxColumn("Error?", width="small"),
