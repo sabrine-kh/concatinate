@@ -42,6 +42,24 @@ with st.sidebar:
     if st.button("📄 Extract a new Part"):
         st.switch_page("pages/extraction_attributs.py")
 
+def extract_json_from_string(s):
+    """
+    Extracts the first valid JSON object from a string.
+    Returns the parsed dict, or None if not found.
+    """
+    if not s or not isinstance(s, str):
+        return None
+    # Remove <think>...</think> blocks
+    s = re.sub(r'<think>.*?</think>', '', s, flags=re.DOTALL)
+    # Find the first {...} block
+    match = re.search(r'\{.*\}', s, flags=re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except Exception:
+            return None
+    return None
+
 # --- Playwright Browser Installation ---
 def install_playwright_browsers():
     """Install Playwright browsers if needed."""
@@ -934,20 +952,3 @@ else:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
     
 
-def extract_json_from_string(s):
-    """
-    Extracts the first valid JSON object from a string.
-    Returns the parsed dict, or None if not found.
-    """
-    if not s or not isinstance(s, str):
-        return None
-    # Remove <think>...</think> blocks
-    s = re.sub(r'<think>.*?</think>', '', s, flags=re.DOTALL)
-    # Find the first {...} block
-    match = re.search(r'\{.*\}', s, flags=re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(0))
-        except Exception:
-            return None
-    return None
