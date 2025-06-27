@@ -25,9 +25,9 @@ st.markdown(
     <style>
     [data-testid='stSidebarNav'] {display: none;}
     
-    /* Sidebar white gradient */
+    /* Sidebar white background */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%) !important;
+        background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%) !important;
     }
     /* Button styling with blue theme */
     .stButton > button {
@@ -120,14 +120,14 @@ VECTOR_MATCH_COUNT = 3
 # --- Initialize Clients ---
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    st.success("Supabase client initialized.")
+    # st.success("Supabase client initialized.")
 except Exception as e:
     st.error(f"Error initializing Supabase client: {e}")
     st.stop()
 
 try:
     st_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    st.success(f"Sentence Transformer model ({EMBEDDING_MODEL_NAME}) loaded.")
+    # st.success(f"Sentence Transformer model ({EMBEDDING_MODEL_NAME}) loaded.")
     test_emb = st_model.encode("test")
     if len(test_emb) != EMBEDDING_DIMENSIONS:
         raise ValueError("Embedding dimension mismatch")
@@ -137,7 +137,7 @@ except Exception as e:
 
 try:
     groq_client = Groq(api_key=GROQ_API_KEY)
-    st.success("Groq client initialized.")
+    # st.success("Groq client initialized.")
 except Exception as e:
     st.error(f"Error initializing Groq client: {e}")
     st.stop()
