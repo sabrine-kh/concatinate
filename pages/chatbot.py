@@ -21,9 +21,32 @@ st.set_page_config(
 )
 
 st.markdown(
-    """<style>
+    """
+    <style>
     [data-testid='stSidebarNav'] {display: none;}
-    </style>""",
+    
+    /* Sidebar blue gradient */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%) !important;
+    }
+    /* Button styling with blue theme */
+    .stButton > button {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 24px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.2);
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #2a5298 0%, #4a90e2 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.4);
+    }
+    </style>
+    """,
     unsafe_allow_html=True
 )
 
@@ -87,8 +110,8 @@ EMBEDDING_DIMENSIONS = 384
 # ░░░  MODEL SWITCH  ░░░
 GROQ_MODEL_FOR_SQL = "qwen-qwq-32b"              ### <-- CHANGED
 GROQ_MODEL_FOR_ANSWER = "qwen-qwq-32b"              ### <-- CHANGED
-st.write(f"Using Groq Model for SQL: {GROQ_MODEL_FOR_SQL}")
-st.write(f"Using Groq Model for Answer: {GROQ_MODEL_FOR_ANSWER}")
+# st.write(f"Using Groq Model for SQL: {GROQ_MODEL_FOR_SQL}")
+# st.write(f"Using Groq Model for Answer: {GROQ_MODEL_FOR_ANSWER}")
 
 # --- Search Parameters ---
 VECTOR_SIMILARITY_THRESHOLD = 0.4
@@ -396,21 +419,6 @@ Answer the user question based *only* on the provided context."""
                 
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": llm_response})
-
-    # Add a sidebar with information about the models being used
-    with st.sidebar:
-        st.header("Model Information")
-        st.markdown("""
-        - **SQL Generation Model**: qwen-qwq-32b
-        - **Answer Generation Model**: qwen-qwq-32b
-        - **Embedding Model**: sentence-transformers/all-MiniLM-L6-v2
-        """)
-        
-        st.header("Search Parameters")
-        st.markdown("""
-        - **Vector Similarity Threshold**: 0.4
-        - **Vector Match Count**: 3
-        """)
 
 # The chatbot will be called from app.py
 if __name__ == "__main__":
