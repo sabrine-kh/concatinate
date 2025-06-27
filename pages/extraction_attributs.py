@@ -68,7 +68,7 @@ if 'playwright_installed' not in st.session_state:
 
 # --- Imports ---
 import config
-from pdf_processor import process_uploaded_pdfs
+from pdf_processor import process_uploaded_pdfs, fetch_chunks
 from vector_store import (
     get_embedding_function,
     setup_vector_store
@@ -596,8 +596,18 @@ else:
                      with st.spinner(f"Stage 2: Extracting {attribute_key} from PDF Data..."):
                         try:
                             start_time = time.time()
+                            # --- Tag-aware context retrieval ---
+                            context_chunks = fetch_chunks(
+                                st.session_state.retriever,
+                                part_number,
+                                attribute_key,
+                                k=8
+                            )
+                            context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
+                            logger.debug(f"Context for '{attribute_key}' (part {part_number}): {context_text[:500]}")
                             pdf_input = {
-                                "extraction_instructions": pdf_instruction, # Use specific PDF instruction
+                                "context": context_text,
+                                "extraction_instructions": pdf_instruction,
                                 "attribute_key": attribute_key,
                                 "part_number": part_number if part_number else "Not Provided"
                             }
