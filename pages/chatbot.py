@@ -40,6 +40,32 @@ with st.sidebar:
 if st.sidebar.button("← Back to Main App", use_container_width=True):
     st.switch_page("app.py")
 
+# Add blue header band at the top
+st.markdown(
+    """
+    <style>
+    .header-band {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
+        color: white;
+        padding: 2rem 0;
+        margin: -1rem -1rem 2rem -1rem;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
+    }
+    .header-band h1 {
+        font-size: 3.5em;
+        margin: 0;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    </style>
+    <div class="header-band">
+        <h1>LEONI</h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # --- Configuration ---
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
