@@ -301,8 +301,9 @@ def process_pdfs_in_background(uploaded_files: List[BinaryIO], temp_dir: str = "
 def fetch_chunks(retriever, part_number, attr_key, k=8):
     """
     Tag-aware retrieval: returns only chunks that match the part_number and have a non-empty tag for attr_key.
+    Uses get_relevant_documents for compatibility with VectorStoreRetriever.
     """
-    dense_results = retriever.similarity_search(attr_key, k=k)
+    dense_results = retriever.get_relevant_documents(attr_key)[:k]
     filtered = [
         chunk for chunk in dense_results
         if (
