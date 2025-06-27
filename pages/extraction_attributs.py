@@ -948,7 +948,7 @@ else:
         for _, row in edited_df.iterrows():
             prompt_name = row['Prompt Name']
             extracted_value = str(row['Extracted Value'])
-            cards_html += f'<div style="background: #f8f9fa; border: 2px solid #1e3c72; border-radius: 12px; padding: 1rem 2rem; min-width: 180px; text-align: center; font-weight: bold; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.08);"><div style="color: #1e3c72; font-size: 1em; margin-bottom: 0.5em;">{prompt_name}</div><div style="font-size: 1.2em;">{extracted_value}</div></div>'
+            cards_html += f'<div style="background: #f8f9fa; border: 2px solid #1e3c72; border-radius: 10px; padding: 0.5rem 1rem; min-width: 100px; text-align: center; font-weight: bold; box-shadow: 0 2px 8px rgba(30, 60, 114, 0.06);"><div style="color: #1e3c72; font-size: 0.9em; margin-bottom: 0.3em;">{prompt_name}</div><div style="font-size: 1em;">{extracted_value}</div></div>'
 
         cards_html += '</div>'
 

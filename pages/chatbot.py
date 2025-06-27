@@ -70,13 +70,13 @@ st.markdown(
     .header-band {
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
         color: white;
-        padding: 2rem 0;
+        padding: 0.7rem 0;
         margin: -1rem -1rem 2rem -1rem;
         text-align: center;
         box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
     }
     .header-band h1 {
-        font-size: 3.5em;
+        font-size: 2.2em;
         margin: 0;
         font-weight: bold;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
