@@ -314,13 +314,40 @@ def fetch_chunks(retriever, part_number, attr_key, k=8):
     Tag-aware retrieval: returns only chunks that match the part_number and have a non-empty tag for attr_key.
     Uses get_relevant_documents for compatibility with VectorStoreRetriever.
     """
+    from loguru import logger
+    
+    # Get initial dense results
     dense_results = retriever.get_relevant_documents(attr_key)[:k]
-    filtered = [
-        chunk for chunk in dense_results
-        if (
-            (not part_number or str(chunk.metadata.get("part_number", "")).strip() == str(part_number).strip())
-            and chunk.metadata.get(attr_key) is not None  # Check for None (no matches)
-            and chunk.metadata.get(attr_key) != ""  # Check for empty string
-        )
-    ]
+    logger.debug(f"Retrieved {len(dense_results)} initial chunks for attribute '{attr_key}'")
+    
+    # Log metadata for debugging
+    for i, chunk in enumerate(dense_results):
+        logger.debug(f"Chunk {i+1} metadata: {chunk.metadata}")
+    
+    filtered = []
+    for chunk in dense_results:
+        chunk_part_number = chunk.metadata.get("part_number", "")
+        chunk_attr_value = chunk.metadata.get(attr_key)
+        
+        # Check part number match (if part_number is provided AND stored in metadata)
+        part_number_match = True
+        if part_number and chunk_part_number:  # Only check if both are provided
+            part_number_match = str(chunk_part_number).strip() == str(part_number).strip()
+            logger.debug(f"Part number check: chunk='{chunk_part_number}' vs query='{part_number}' -> {part_number_match}")
+        elif part_number and not chunk_part_number:
+            # If user provided part number but chunk doesn't have it, skip the check
+            logger.debug(f"Part number provided '{part_number}' but chunk has no part_number field, skipping part number check")
+            part_number_match = True  # Allow through since we can't verify
+        
+        # Check attribute tag exists and is not empty
+        attr_tag_exists = chunk_attr_value is not None and chunk_attr_value != ""
+        logger.debug(f"Attribute tag check: {attr_key}='{chunk_attr_value}' -> {attr_tag_exists}")
+        
+        if part_number_match and attr_tag_exists:
+            filtered.append(chunk)
+            logger.debug(f"Chunk accepted: part_number={chunk_part_number}, {attr_key}={chunk_attr_value}")
+        else:
+            logger.debug(f"Chunk rejected: part_number_match={part_number_match}, attr_tag_exists={attr_tag_exists}")
+    
+    logger.info(f"Filtered {len(filtered)} chunks out of {len(dense_results)} for attribute '{attr_key}' and part number '{part_number}'")
     return filtered
