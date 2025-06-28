@@ -41,7 +41,7 @@ is_persistent = bool(CHROMA_PERSIST_DIRECTORY) # True if directory is set, False
 RETRIEVER_K = int(os.getenv("RETRIEVER_K", 8)) # Renamed from RETRIEVER_SEARCH_K
 
 # --- LLM Request Configuration ---
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.1)) # Adjusted default
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.0)) # Adjusted default
 LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", 131072))
 
 # --- Logging ---
