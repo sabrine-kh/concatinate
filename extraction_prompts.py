@@ -681,10 +681,9 @@ OUTPUT FORMAT
 • Do NOT include any other keys, text, or explanation.
 
 FEW-SHOT EXAMPLES  
-1) Context: “Type A (Blue CPA) vs Type B (Red CPA)” → `{ "{attribute_key}": "Blue" }` or `{ "{attribute_key}": "Red" }`  
+1) Context: “Type A (Red CPA) vs Type B (Blue CPA)” → `{ "{attribute_key}": "Blue" }` or `{ "{attribute_key}": "Red" }`  
 2) Context: “Coding key is Orange.” → `{ "{attribute_key}": "Orange" }`  
 3) Context: “Black housing with black CPA/TTA.” → `{ "{attribute_key}": "None" }`  
-4) Context: “SEAL COLOR: SEE TABLE” + table “2098198-5 … RED” → `{ "{attribute_key}": "Red" }`
 
 """
 
