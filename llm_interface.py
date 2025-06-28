@@ -28,15 +28,15 @@ def initialize_llm():
 
     try:
         llm = ChatGroq(
-            temperature=0.0,  # Zero randomness
+            temperature=0.0,
+            top_p=1.0,                 # leave at 1 for greedy decoding
             groq_api_key=config.GROQ_API_KEY,
             model_name=config.LLM_MODEL_NAME,
             max_tokens=config.LLM_MAX_OUTPUT_TOKENS,
-            # Add these for maximum consistency:
-            top_p=1.0,        # No nucleus sampling
-            top_k=1,          # Always pick top token
-            frequency_penalty=0.0,  # No frequency adjustments
-            presence_penalty=0.0    # No presence adjustments
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            seed=42                    # optional but guarantees replayability
+            # model_kwargs={}          # <- only needed for truly custom params
         )
         # logger.info(f"Groq LLM initialized with model: {config.LLM_MODEL_NAME}") # Remove internal logging
         return llm
