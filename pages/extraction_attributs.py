@@ -386,6 +386,8 @@ if 'evaluation_metrics' not in st.session_state:
     st.session_state.evaluation_metrics = None
 if 'extraction_performed' not in st.session_state:
     st.session_state.extraction_performed = False
+if 'extraction_attempts' not in st.session_state:
+    st.session_state.extraction_attempts = 0
 if 'scraped_table_html_cache' not in st.session_state:
     st.session_state.scraped_table_html_cache = None
 if 'current_part_number_scraped' not in st.session_state:
@@ -483,7 +485,7 @@ with st.sidebar:
             st.session_state.pdf_chain = None
             st.session_state.web_chain = None
             st.session_state.processed_files = []
-            reset_evaluation_state() # Reset evaluation results AND extraction_performed flag
+            reset_evaluation_state() # Reset evaluation results AND extraction flag
 
             filenames = [f.name for f in uploaded_files]
             logger.info(f"Starting processing for {len(filenames)} files: {', '.join(filenames)}")
@@ -577,8 +579,24 @@ if not st.session_state.pdf_chain or not st.session_state.web_chain:
     if not st.session_state.evaluation_results and not st.session_state.extraction_performed:
          reset_evaluation_state() # Ensure reset if no chain and extraction not done
 else:
+    # Add debug logging
+    logger.debug(f"PDF Chain: {st.session_state.pdf_chain is not None}")
+    logger.debug(f"Web Chain: {st.session_state.web_chain is not None}")
+    logger.debug(f"Extraction Performed: {st.session_state.extraction_performed}")
+    logger.debug(f"Evaluation Results: {len(st.session_state.evaluation_results) if st.session_state.evaluation_results else 0}")
+    
     # --- Block 1: Run Extraction (if needed) --- 
     if (st.session_state.pdf_chain and st.session_state.web_chain) and not st.session_state.extraction_performed:
+        # Safety check to prevent infinite loops
+        if st.session_state.extraction_attempts > 3:
+            logger.error("Too many extraction attempts detected. Resetting state.")
+            st.error("Extraction loop detected. Please refresh the page and try again.")
+            reset_evaluation_state()
+            st.session_state.extraction_attempts = 0
+            st.stop()
+        
+        st.session_state.extraction_attempts += 1
+        logger.info(f"Starting extraction process... (attempt {st.session_state.extraction_attempts})")
         # --- Get Part Number --- 
         part_number = st.session_state.get("part_number_input", "").strip()
         # ---------------------
@@ -887,6 +905,8 @@ else:
         if extraction_successful:
             st.session_state.evaluation_results = extraction_results_list
             st.session_state.extraction_performed = True
+            st.session_state.extraction_attempts = 0  # Reset counter on success
+            logger.info("Extraction completed successfully, setting extraction_performed=True")
             st.success("Extraction complete (using Web data where possible, falling back to PDF). Enter ground truth below.")
             # st.rerun() # REMOVE/COMMENT OUT to keep cards visible
         else:
@@ -894,6 +914,8 @@ else:
             # Optionally store partial results if desired
             st.session_state.evaluation_results = extraction_results_list
             st.session_state.extraction_performed = True
+            st.session_state.extraction_attempts = 0  # Reset counter even on error
+            logger.info("Extraction completed with issues, setting extraction_performed=True")
             # st.rerun() # REMOVE/COMMENT OUT to keep cards visible (even on error)
 
 
