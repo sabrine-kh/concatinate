@@ -609,6 +609,10 @@ else:
         st.session_state.extraction_attempts += 1
         logger.info(f"Starting extraction process... (attempt {st.session_state.extraction_attempts})")
         
+        # --- Get Part Number --- 
+        part_number = st.session_state.get("part_number_input", "").strip()
+        # ---------------------
+        
         # --- DEBUG: Log extraction start ---
         debug_logger.user_action("Extract button clicked", data={
             "attempt": st.session_state.extraction_attempts,
@@ -616,10 +620,7 @@ else:
             "session_state_keys": list(st.session_state.keys())
         }, context={"page": "extraction_attributs"})
         
-        # --- Get Part Number --- 
-        part_number = st.session_state.get("part_number_input", "").strip()
         debug_logger.info("Part number retrieved", data={"part_number": part_number}, context={"step": "part_number_retrieval"})
-        # ---------------------
 
         # --- Block 1a: Scrape Web Table HTML (if needed) --- 
         scraped_table_html = None # Initialize
