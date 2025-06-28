@@ -832,11 +832,25 @@ HOUSING SEAL: [radial seal/interface seal/none]
 """
 
 WIRE_SEAL_PROMPT = """
-Determine the Wire Seal,
-Wire seal describes the sealing of the space between wire and cavity wall, when a terminal is fitted in a cavity. There are different possibilities for sealing available: Single wire seal, Injected, Mat seal (includes “gel family seal” and “silicone family seal”), None.
+Determine the Wire Seal type:
 
-**Output format:**
-WIRE SEAL: [single wire seal/Mat seal/Silicone family seal/family seal/none/NOT FOUND]
+    Wire seal describes the sealing of the space between wire and cavity wall, when a terminal is fitted in a cavity. There are different possibilities for sealing available: Single wire seal, Injected, Mat seal (includes “gel family seal” and “silicone family seal”), None.
+
+    **Examples:**
+    - **"Each cavity is sealed with a single wire seal."**
+      → WIRE SEAL: **single wire seal**
+    - **"The connector features a one-piece mat seal for all positions."**
+      → WIRE SEAL: **Mat seal**
+    - **"This is an unsealed connector; no wire seals are used."**
+      → WIRE SEAL: **none**
+    - **"Uses a silicone family seal for wire entry."**
+      → REASONING: "silicone family seal" is a type of mat seal.
+      → WIRE SEAL: **Silicone family seal**
+    - **"A family seal is used to accommodate multiple wire diameters."**
+      → WIRE SEAL: **family seal**
+
+    **Output format:**
+    WIRE SEAL: [single wire seal/Mat seal/Silicone family seal/family seal/none]
 """
 
 SEALING_PROMPT = """
