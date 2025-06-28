@@ -94,11 +94,12 @@ def setup_vector_store(
             vector_store.persist() # Explicitly call persist just in case
 
         logger.success(f"Vector store '{collection_name}' created/updated and persisted successfully.")
-        # Return the retriever
-        return vector_store.as_retriever(search_kwargs={
-            "k": config.RETRIEVER_K,
-            "score_threshold": config.VECTOR_SIMILARITY_THRESHOLD
-        })
+        # Return the retriever with similarity threshold
+        return ThresholdRetriever(
+            vectorstore=vector_store,
+            search_kwargs={"k": config.RETRIEVER_K},
+            threshold=config.VECTOR_SIMILARITY_THRESHOLD
+        )
 
     except Exception as e:
         logger.error(f"Failed to create or populate Chroma vector store '{collection_name}': {e}", exc_info=True)
@@ -146,10 +147,11 @@ def load_existing_vector_store(embedding_function) -> Optional[VectorStoreRetrie
         #      logger.warning(f"Loaded collection '{collection_name}', but could not verify item count.")
 
         logger.success(f"Successfully loaded vector store '{collection_name}'.")
-        return vector_store.as_retriever(search_kwargs={
-            "k": config.RETRIEVER_K,
-            "score_threshold": config.VECTOR_SIMILARITY_THRESHOLD
-        })
+        return ThresholdRetriever(
+            vectorstore=vector_store,
+            search_kwargs={"k": config.RETRIEVER_K},
+            threshold=config.VECTOR_SIMILARITY_THRESHOLD
+        )
 
     except Exception as e:
         # This exception block might catch cases where the collection *within* the directory doesn't exist
@@ -160,5 +162,39 @@ def load_existing_vector_store(embedding_function) -> Optional[VectorStoreRetrie
              logger.warning(f"Persistent collection '{collection_name}' not found in directory '{persist_directory}'. Cannot load.")
 
         return None
+
+# --- Custom Retriever with Similarity Threshold ---
+class ThresholdRetriever(VectorStoreRetriever):
+    """Custom retriever that applies similarity threshold filtering."""
+    
+    def __init__(self, vectorstore, search_kwargs, threshold):
+        super().__init__()
+        self.vectorstore = vectorstore
+        self.search_kwargs = search_kwargs
+        self.threshold = threshold
+    
+    def _get_relevant_documents(self, query: str) -> List[Document]:
+        """Get documents with similarity threshold filtering."""
+        # Get documents with scores
+        docs_and_scores = self.vectorstore.similarity_search_with_score(
+            query, 
+            k=self.search_kwargs.get("k", 8)
+        )
+        
+        # Filter by threshold
+        filtered_docs = []
+        for doc, score in docs_and_scores:
+            if score >= self.threshold:
+                filtered_docs.append(doc)
+                logger.debug(f"✅ Chunk passed threshold (score: {score:.3f}): {doc.page_content[:100]}...")
+            else:
+                logger.debug(f"❌ Chunk below threshold (score: {score:.3f}): {doc.page_content[:100]}...")
+        
+        logger.info(f"Retrieved {len(docs_and_scores)} chunks, {len(filtered_docs)} passed threshold {self.threshold}")
+        return filtered_docs
+    
+    async def _aget_relevant_documents(self, query: str) -> List[Document]:
+        """Async version of document retrieval."""
+        return self._get_relevant_documents(query)
 
 # Add this import at the top of vector_store.py
