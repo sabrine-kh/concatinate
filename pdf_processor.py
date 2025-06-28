@@ -25,6 +25,8 @@ ATTRIBUTE_DICTIONARY_PATH = os.getenv("ATTRIBUTE_DICTIONARY_PATH", "attribute_di
 try:
     with open(ATTRIBUTE_DICTIONARY_PATH, "r", encoding="utf-8") as f:
         ATTRIBUTE_DICTIONARY = json.load(f)
+    logger.info(f"Successfully loaded attribute dictionary with {len(ATTRIBUTE_DICTIONARY)} attributes")
+    logger.debug(f"Attribute dictionary keys: {list(ATTRIBUTE_DICTIONARY.keys())}")
 except Exception as e:
     logger.warning(f"Could not load attribute dictionary: {e}")
     ATTRIBUTE_DICTIONARY = {}
@@ -47,7 +49,16 @@ def tag_chunk_with_dictionary(chunk_text, attribute_regexes):
     tags = {}
     for attr, regex in attribute_regexes.items():
         matches = regex.findall(chunk_text)
-        tags[attr] = list({m.strip() for m in matches})
+        # Convert matches to a list and handle empty lists properly for Chroma metadata
+        match_list = list({m.strip() for m in matches})
+        if match_list:
+            # If we have matches, store them as a comma-separated string
+            tags[attr] = ", ".join(match_list)
+            logger.debug(f"Found matches for '{attr}': {match_list}")
+        else:
+            # If no matches, store as None (Chroma accepts None as metadata value)
+            tags[attr] = None
+    logger.debug(f"Generated tags: {tags}")
     return tags
 
 # --- Canonicalization Utility ---
@@ -308,8 +319,8 @@ def fetch_chunks(retriever, part_number, attr_key, k=8):
         chunk for chunk in dense_results
         if (
             (not part_number or str(chunk.metadata.get("part_number", "")).strip() == str(part_number).strip())
-            and chunk.metadata.get(attr_key)
-            and len(chunk.metadata[attr_key]) > 0
+            and chunk.metadata.get(attr_key) is not None  # Check for None (no matches)
+            and chunk.metadata.get(attr_key) != ""  # Check for empty string
         )
     ]
     return filtered
