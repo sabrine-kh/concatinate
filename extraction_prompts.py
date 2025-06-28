@@ -832,48 +832,8 @@ HOUSING SEAL: [radial seal/interface seal/none]
 """
 
 WIRE_SEAL_PROMPT = """
-Determine the Wire Seal type by following these steps in order. Your final answer must be one of the specified options.
-
-**STEP 1: EXPLICIT TERM SCAN**
-- First, scan the document for an exact match to any of the following terms (case-insensitive): "single wire seal", "injected", "mat seal", "family seal", or "silicone family seal". If a direct match is found, use that as the answer.
-- Also, scan for explicit negatives like "no wire seal" or "unsealed wire entry". If found, the answer is "none".
-
-**STEP 2: INFERENCE FROM TABLES AND PART NUMBERS**
-- If no explicit term is found, analyze tables listing "Applicable Terminals and Wire Seals":
-  - **Rule A (Family Seal):** If the table shows **one single** `Wire Seal P/N` listed as compatible with **multiple different** `Wire Sizes` or `Terminal P/N`s, classify the seal as a "family seal".
-  - **Rule B (Single Wire Seal):** If the table shows a **unique** `Wire Seal P/N` for **each** `Wire Size` or `Terminal P/N`, classify the seal as a "single wire seal".
-
-**STEP 3: INFERENCE FROM MATERIAL AND DESCRIPTIONS**
-- If the type is still undetermined, analyze material and general descriptions:
-  - If the seal is described as a "one-piece", "multi-cavity", or "integral" seal, classify it as "Mat seal".
-  - If the wire seal's material is described as "Silicone Rubber" or "Gel", classify it as a "silicone family seal".
-
-**STEP 4: FINAL DEFAULT**
-- If after applying all above steps, no specific type can be identified but the part is generally described as "Sealed", the answer is **NOT FOUND** because the specific type is unknown.
-- If there is no mention of seals or sealing at all, the answer is **none**.
-
----
-**Examples:**
-
-- **Input Text:** "The connector features a one-piece mat seal for all positions."
-  - **REASONING:** [Step 1] Explicit term "mat seal" is found.
-  - **WIRE SEAL:** `Mat seal`
-
-- **Input Text:** "Applicable Wire Seal (P/N 828904-1) fits wire sizes 0.5-1.0mm²."
-  - **REASONING:** [Step 2A] One seal P/N is listed for multiple wire sizes. This indicates a family seal.
-  - **WIRE SEAL:** `family seal`
-
-- **Input Text:** "Table shows: Wire Size 0.5mm² uses Seal P/N 9-123. Wire Size 0.75mm² uses Seal P/N 9-456."
-  - **REASONING:** [Step 2B] Each wire size has its own unique seal part number.
-  - **WIRE SEAL:** `single wire seal`
-
-- **Input Text:** "Material for wire seal: Silicone Rubber."
-  - **REASONING:** [Step 3] Material is specified as "Silicone Rubber".
-  - **WIRE SEAL:** `silicone family seal`
-
-- **Input Text:** "This is an unsealed connector; no wire seals are used."
-  - **REASONING:** [Step 1] Explicit negative "no wire seals" is found.
-  - **WIRE SEAL:** `none`
+Determine the Wire Seal,
+Wire seal describes the sealing of the space between wire and cavity wall, when a terminal is fitted in a cavity. There are different possibilities for sealing available: Single wire seal, Injected, Mat seal (includes “gel family seal” and “silicone family seal”), None.
 
 **Output format:**
 WIRE SEAL: [single wire seal/Mat seal/Silicone family seal/family seal/none/NOT FOUND]
