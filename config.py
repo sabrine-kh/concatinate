@@ -38,7 +38,7 @@ is_persistent = bool(CHROMA_PERSIST_DIRECTORY) # True if directory is set, False
 # CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 200))  # Restored
 
 # --- Retriever Configuration ---
-RETRIEVER_K = int(os.getenv("RETRIEVER_K", 5)) # Renamed from RETRIEVER_SEARCH_K
+RETRIEVER_K = int(os.getenv("RETRIEVER_K", 8)) # Renamed from RETRIEVER_SEARCH_K
 
 # --- LLM Request Configuration ---
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.1)) # Adjusted default
