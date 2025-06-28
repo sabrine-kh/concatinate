@@ -40,6 +40,12 @@ def build_attribute_regexes(attribute_dict):
             continue
         pattern = r'(' + '|'.join(clean_values) + r')'
         regexes[attr] = re.compile(pattern, re.IGNORECASE)
+        
+        # Debug for Contact Systems
+        if attr == "Contact Systems":
+            logger.info(f"Contact Systems regex pattern: {pattern}")
+            logger.info(f"Contact Systems clean values (first 5): {clean_values[:5]}")
+    
     return regexes
 
 ATTRIBUTE_REGEXES = build_attribute_regexes(ATTRIBUTE_DICTIONARY)
@@ -47,6 +53,15 @@ ATTRIBUTE_REGEXES = build_attribute_regexes(ATTRIBUTE_DICTIONARY)
 # --- Tagging Utility ---
 def tag_chunk_with_dictionary(chunk_text, attribute_regexes):
     tags = {}
+    logger.info(f"Tagging chunk with {len(attribute_regexes)} attribute regexes")
+    
+    # Special debugging for Contact Systems
+    if "Contact Systems" in attribute_regexes:
+        contact_regex = attribute_regexes["Contact Systems"]
+        contact_matches = contact_regex.findall(chunk_text)
+        logger.info(f"Contact Systems regex matches: {contact_matches}")
+        logger.info(f"Looking for 'MCP 2.8' in text: {'MCP 2.8' in chunk_text}")
+    
     for attr, regex in attribute_regexes.items():
         matches = regex.findall(chunk_text)
         # Convert matches to a list and handle empty lists properly for Chroma metadata
@@ -54,11 +69,16 @@ def tag_chunk_with_dictionary(chunk_text, attribute_regexes):
         if match_list:
             # If we have matches, store them as a comma-separated string
             tags[attr] = ", ".join(match_list)
-            logger.debug(f"Found matches for '{attr}': {match_list}")
+            logger.info(f"Found matches for '{attr}': {match_list}")
         else:
             # If no matches, store as None (Chroma accepts None as metadata value)
             tags[attr] = None
-    logger.debug(f"Generated tags: {tags}")
+            logger.debug(f"No matches found for '{attr}'")
+    
+    # Log summary of what was found
+    found_attrs = [attr for attr, value in tags.items() if value is not None]
+    logger.info(f"Generated tags for {len(found_attrs)} attributes: {found_attrs}")
+    logger.debug(f"All generated tags: {tags}")
     return tags
 
 # --- Canonicalization Utility ---
@@ -320,6 +340,15 @@ def fetch_chunks(retriever, part_number, attr_key, k=8):
     dense_results = retriever.get_relevant_documents(attr_key)[:k]
     logger.debug(f"Retrieved {len(dense_results)} initial chunks for attribute '{attr_key}'")
     
+    # Special debugging for Contact Systems
+    if attr_key == "Contact Systems":
+        logger.info(f"=== SPECIAL DEBUG FOR CONTACT SYSTEMS ===")
+        logger.info(f"Retrieved {len(dense_results)} chunks for Contact Systems")
+        for i, chunk in enumerate(dense_results):
+            logger.info(f"Chunk {i+1} metadata: {chunk.metadata}")
+            logger.info(f"Chunk {i+1} has Contact Systems tag: {chunk.metadata.get('Contact Systems', 'NOT FOUND')}")
+            logger.info(f"Chunk {i+1} content preview: {chunk.page_content[:200]}...")
+    
     # Log metadata for debugging
     for i, chunk in enumerate(dense_results):
         logger.debug(f"Chunk {i+1} metadata: {chunk.metadata}")
@@ -349,5 +378,11 @@ def fetch_chunks(retriever, part_number, attr_key, k=8):
         else:
             logger.debug(f"Chunk rejected: part_number_match={part_number_match}, attr_tag_exists={attr_tag_exists}")
     
-    logger.info(f"Filtered {len(filtered)} chunks out of {len(dense_results)} for attribute '{attr_key}' and part number '{part_number}'")
+    # If no chunks found with attribute tags, fall back to semantic similarity only
+    if not filtered and dense_results:
+        logger.warning(f"No chunks found with '{attr_key}' tag. Falling back to semantic similarity retrieval.")
+        filtered = dense_results[:k]  # Take the top k semantically similar chunks
+        logger.info(f"Fallback: Using {len(filtered)} semantically similar chunks for '{attr_key}'")
+    
+    logger.info(f"Final result: {len(filtered)} chunks for attribute '{attr_key}' and part number '{part_number}'")
     return filtered

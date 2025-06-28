@@ -978,9 +978,7 @@ Identify approved contact systems using this reasoning chain:
     - **"Designed for MLK 1.2 Sm terminals."**
       → REASONING: [Step1] Explicit family mention
       → CONTACT SYSTEMS: **MLK 1.2 Sm**
-    - **\"Compatible with various 2.8mm systems\"**
-      → REASONING: [Step1] Vague → [Step5] Non-specific → [Final] NOT FOUND
-      → CONTACT SYSTEMS: **NOT FOUND**
+   
 
     **Output format:**
     CONTACT SYSTEMS: [system1,system2,...]
