@@ -646,57 +646,46 @@ Determine connector color using this reasoning chain:
 """
 
 COLOUR_CODING_PROMPT = """
-Determine Colour Coding using this reasoning chain:
 
-    STEP 1: MECHANICAL CODING PREREQUISITE
-    - Confirm existence of mechanical coding:
-      ✓ Check for Coding A/B/C/D/Z or physical keying
-      ✗ No mechanical coding → Return \"none\"
+You MUST follow these five steps, in order, using ONLY the PDF context.  Do NOT shortcut or omit any step.
 
-    STEP 2: COMPONENT FOCUS IDENTIFICATION
-    - Scan primary coding components:
-      ✓ CPA latches ✓ TPA inserts ✓ Coding keys
-      ✓ Mechanical polarization features
-      ✗ Ignore non-coding parts (housing base, seals)
+STEP 1: MECHANICAL CODING PREREQUISITE  
+• From the context, confirm there is mechanical coding (Coding A/B/C/D/Z, physical keying, CPA/TPA).  
+• If NONE is present, stop and return “None”.
 
-    STEP 3: COLOR DIFFERENTIATION CHECK
-    - Compare component colors to base housing:
-      ✓ Different color on ≥1 coding component → Proceed
-      ✗ Identical colors → Return \"none\"
-    - Validate explicit differentiation purpose:
-      * \"Color-coded for variant identification\"
-      * \"Visual distinction between versions\"
+STEP 2: COMPONENT FOCUS IDENTIFICATION  
+• Identify the coding components (CPA latches, TPA inserts, coding keys, mechanical polarization features).  
+• Ignore all other parts (housing, seals unless explicitly color-coded).
 
-    STEP 4: DOMINANT COLOR SELECTION
-    - Hierarchy for color determination:
-      1. Explicit coding statements (\"Red denotes Type B\")
-      2. Majority of coding components
-      3. Highest contrast vs housing
-      4. First mentioned color
+STEP 3: COLOR DIFFERENTIATION CHECK  
+• If you see “COLOR: SEE TABLE,” ALWAYS locate and parse the following table before proceeding.  
+• Compare each coding component’s color (from snippet or parsed table) to the base housing color.  
+  – If ALL coding components match the housing → return “None”.  
+  – If ≥1 differs, proceed.  
+• Ensure the text indicates the purpose is “color-coded for variant identification” or equivalent.
 
-    STEP 5: DOCUMENT CONSISTENCY VERIFICATION
-    - Require ALL:
-      1. Same drawing/family context
-      2. Multiple connector variants present
-      3. Color-coding purpose clearly stated
-    - Reject isolated color mentions
+STEP 4: DOMINANT COLOR SELECTION (in priority order)  
+1. Any explicit “X denotes variant Y” statements.  
+2. The color used by the MAJORITY of coding components.  
+3. The color with the HIGHEST visual contrast vs. housing.  
+4. The FIRST mentioned color.
 
-    **Examples:**
-    - **\"Type A (Blue CPA) vs Type B (Red CPA)\"**
-      → REASONING: [Step1] Mech coding ✓ → [Step3] Color diff ✓ → [Step4] Explicit
-      → COLOUR CODING: **Blue** or **Red** (depending on variant)
-    - **"The coding key for this connector is Orange."**
-      → REASONING: [Step1] Mech coding assumed ✓ → [Step2] Coding key ✓ → [Step3] Orange differs from housing (assumed) → [Step4] Explicit color
-      → COLOUR CODING: **Orange**
-    - **"Housing is natural, with a Pink CPA for coding."**
-      → REASONING: [Step1] Mech coding ✓ → [Step3] Color diff ✓ → [Step4] Explicit
-      → COLOUR CODING: **Pink**
-    - **\"Black housing with black CPA/TTA\"**
-      → REASONING: [Step1] Mech coding ✓ → [Step3] No diff → \"none\"
-      → COLOUR CODING: **None**
+STEP 5: DOCUMENT CONSISTENCY VERIFICATION  
+• Confirm all of: same drawing/family context; multiple variants present; color-coding purpose clearly stated.  
+• If any check fails, return “None”.
 
-    **Output format:**
-    COLOUR CODING: [Color/None]
+OUTPUT FORMAT  
+• Respond with exactly one JSON object:  
+  `{ "{attribute_key}": "extracted_value" }`  
+• `extracted_value` must be either a valid color name (e.g. “Red”, “Blue”, “Orange”) or “None”.  
+• Do NOT include any other keys, text, or explanation.
+
+FEW-SHOT EXAMPLES  
+1) Context: “Type A (Blue CPA) vs Type B (Red CPA)” → `{ "{attribute_key}": "Blue" }` or `{ "{attribute_key}": "Red" }`  
+2) Context: “Coding key is Orange.” → `{ "{attribute_key}": "Orange" }`  
+3) Context: “Black housing with black CPA/TTA.” → `{ "{attribute_key}": "None" }`  
+4) Context: “SEAL COLOR: SEE TABLE” + table “2098198-5 … RED” → `{ "{attribute_key}": "Red" }`
+
 """
 
 # --- Sealing & Environmental ---
