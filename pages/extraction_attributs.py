@@ -10,6 +10,10 @@ import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 # --- End override ---
 
+# --- DEBUG LOGGER INTEGRATION ---
+from debug_logger import debug_logger, DebugTimer, log_streamlit_state, log_json_parsing
+debug_logger.info("Extraction page loaded", context={"page": "extraction_attributs"})
+
 import streamlit as st
 import os
 import time
@@ -23,6 +27,9 @@ from typing import List
 import re
 
 nest_asyncio.apply()
+
+# Log initial session state
+debug_logger.info("Initial session state", data=dict(st.session_state), context={"page": "extraction_attributs"})
 
 # --- UI Setup ---
 st.markdown(
@@ -208,6 +215,10 @@ with st.sidebar:
         st.switch_page("pages/chatbot.py")
     if st.button("📄 Extract a new Part"):
         st.switch_page("pages/extraction_attributs.py")
+    if st.button("🔍 Debug Interface"):
+        st.switch_page("debug_interface.py")
+    if st.button("📊 Debug Summary"):
+        st.switch_page("debug_summary.py")
 
 def extract_json_from_string(s):
     """
@@ -597,53 +608,118 @@ else:
         
         st.session_state.extraction_attempts += 1
         logger.info(f"Starting extraction process... (attempt {st.session_state.extraction_attempts})")
+        
+        # --- DEBUG: Log extraction start ---
+        debug_logger.user_action("Extract button clicked", data={
+            "attempt": st.session_state.extraction_attempts,
+            "part_number": part_number,
+            "session_state_keys": list(st.session_state.keys())
+        }, context={"page": "extraction_attributs"})
+        
         # --- Get Part Number --- 
         part_number = st.session_state.get("part_number_input", "").strip()
+        debug_logger.info("Part number retrieved", data={"part_number": part_number}, context={"step": "part_number_retrieval"})
         # ---------------------
 
         # --- Block 1a: Scrape Web Table HTML (if needed) --- 
         scraped_table_html = None # Initialize
         if part_number: # Only scrape if part number is provided
+            debug_logger.info("Starting web scraping", data={"part_number": part_number}, context={"step": "web_scraping_start"})
+            
             # Check cache first
             if st.session_state.current_part_number_scraped == part_number and st.session_state.scraped_table_html_cache is not None:
                  logger.info(f"Using cached scraped HTML for part number {part_number}.")
                  scraped_table_html = st.session_state.scraped_table_html_cache
+                 debug_logger.info("Using cached web data", data={
+                     "part_number": part_number,
+                     "cached_html_length": len(scraped_table_html) if scraped_table_html else 0
+                 }, context={"step": "web_scraping_cache_hit"})
             else:
                  # Scrape and update cache
                  logger.info(f"Part number {part_number} changed or not cached. Attempting web scrape...")
+                 debug_logger.info("Cache miss, starting web scrape", data={
+                     "part_number": part_number,
+                     "cached_part": st.session_state.current_part_number_scraped
+                 }, context={"step": "web_scraping_cache_miss"})
+                 
                  with st.spinner("Attempting to scrape data from supplier websites..."):
                      scrape_start_time = time.time()
                      try:
                           # Ensure scrape_website_table_html is imported from llm_interface
                           from llm_interface import scrape_website_table_html
+                          
+                          debug_logger.llm_request(
+                              f"Scraping web data for part {part_number}",
+                              "web_scraper",
+                              0.0,
+                              0,
+                              context={"step": "web_scraping_request"}
+                          )
+                          
                           scraped_table_html = loop.run_until_complete(scrape_website_table_html(part_number))
                           scrape_time = time.time() - scrape_start_time
+                          
+                          debug_logger.web_scraping(
+                              f"Part {part_number}",
+                              scraped_table_html if scraped_table_html else "",
+                              scraped_table_html,
+                              context={"step": "web_scraping_response", "duration": scrape_time}
+                          )
+                          
                           if scraped_table_html:
                               logger.success(f"Web scraping successful in {scrape_time:.2f} seconds.")
                               st.caption(f"ℹ️ Found web data for part# {part_number}. Will prioritize.")
+                              debug_logger.info("Web scraping successful", data={
+                                  "duration": scrape_time,
+                                  "html_length": len(scraped_table_html)
+                              }, context={"step": "web_scraping_success"})
                           else:
                               logger.warning(f"Web scraping attempted but failed to find table HTML in {scrape_time:.2f} seconds.")
                               st.caption(f"⚠️ Web scraping failed for part# {part_number}, using PDF data only.")
+                              debug_logger.warning("Web scraping failed", data={
+                                  "duration": scrape_time,
+                                  "reason": "No table HTML found"
+                              }, context={"step": "web_scraping_failed"})
+                          
                           # Update cache
                           st.session_state.scraped_table_html_cache = scraped_table_html
                           st.session_state.current_part_number_scraped = part_number
+                          debug_logger.session_state("scraped_table_html_cache", scraped_table_html, context={"step": "web_scraping_cache_update"})
+                          debug_logger.session_state("current_part_number_scraped", part_number, context={"step": "web_scraping_cache_update"})
+                          
                      except Exception as scrape_e:
                           scrape_time = time.time() - scrape_start_time
                           logger.error(f"Error during web scraping ({scrape_time:.2f}s): {scrape_e}", exc_info=True)
                           st.warning(f"An error occurred during web scraping: {scrape_e}. Using PDF data only.")
+                          
+                          debug_logger.exception(scrape_e, context={
+                              "step": "web_scraping_exception",
+                              "duration": scrape_time,
+                              "part_number": part_number
+                          })
+                          
                           # Ensure cache is cleared on error
                           st.session_state.scraped_table_html_cache = None
                           st.session_state.current_part_number_scraped = part_number
+                          debug_logger.session_state("scraped_table_html_cache", None, context={"step": "web_scraping_cache_clear"})
         else:
              logger.info("No part number provided, skipping web scrape.")
+             debug_logger.info("Skipping web scrape", data={"reason": "No part number provided"}, context={"step": "web_scraping_skipped"})
              # Clear cache if part number is removed
              if st.session_state.current_part_number_scraped is not None:
                   st.session_state.scraped_table_html_cache = None
                   st.session_state.current_part_number_scraped = None
+                  debug_logger.session_state("scraped_table_html_cache", None, context={"step": "web_scraping_cache_clear_no_part"})
+                  debug_logger.session_state("current_part_number_scraped", None, context={"step": "web_scraping_cache_clear_no_part"})
         # --- End Block 1a ---
 
         # --- Log the result of scraping before Stage 1 --- 
         logger.debug(f"Cleaned Scraped HTML content passed to Stage 1: {scraped_table_html[:500] if scraped_table_html else 'None'}...")
+        debug_logger.info("Web scraping completed", data={
+            "has_html": scraped_table_html is not None,
+            "html_length": len(scraped_table_html) if scraped_table_html else 0,
+            "html_preview": scraped_table_html[:1000] if scraped_table_html else None
+        }, context={"step": "web_scraping_complete"})
         # -------------------------------------------------
 
         # --- Block 1b: Two-Stage Extraction Logic --- 
@@ -658,6 +734,12 @@ else:
 
         # --- Stage 1: Web Extraction --- 
         if scraped_table_html:
+            debug_logger.info("Starting Stage 1 (Web Extraction)", data={
+                "total_attributes": len(prompts_to_run),
+                "has_html": True,
+                "html_length": len(scraped_table_html)
+            }, context={"step": "stage1_start"})
+            
             for prompt_name, instructions in prompts_to_run.items(): # Iterate through attributes and their instructions
                 attribute_key = prompt_name
                 web_instruction = instructions["web"] # Get WEB instruction
@@ -666,6 +748,12 @@ else:
                 json_result_str = None
                 run_time = 0.0
                 source = "Web" # Source for this stage
+                
+                debug_logger.info(f"Processing attribute: {attribute_key}", data={
+                    "attribute": attribute_key,
+                    "source": source,
+                    "instruction_length": len(web_instruction)
+                }, context={"step": "stage1_attribute_start", "attribute": attribute_key})
                 
                 with current_col:
                      with st.spinner(f"Stage 1: Extracting {attribute_key} from Web Data..."):
@@ -676,6 +764,15 @@ else:
                                 "attribute_key": attribute_key,
                                 "extraction_instructions": web_instruction # Use specific web instruction
                             }
+                            
+                            debug_logger.llm_request(
+                                f"Extract {attribute_key} from web data",
+                                "web_chain",
+                                0.7,
+                                1000,
+                                context={"step": "stage1_llm_request", "attribute": attribute_key}
+                            )
+                            
                             # --- Log the input to the web chain --- 
                             logger.debug(f"Invoking web_chain for '{attribute_key}' with input keys: {list(web_input.keys())}")
                             # -------------------------------------
@@ -684,15 +781,34 @@ else:
                                 _invoke_chain_and_process(st.session_state.web_chain, web_input, f"{attribute_key} (Web)")
                             )
                             run_time = time.time() - start_time
+                            
+                            debug_logger.llm_response(
+                                "web_chain",
+                                json_result_str if json_result_str else "",
+                                len(json_result_str) if json_result_str else 0,
+                                run_time,
+                                context={"step": "stage1_llm_response", "attribute": attribute_key}
+                            )
+                            
                             logger.info(f"Stage 1 (Web) for '{attribute_key}' took {run_time:.2f} seconds.")
                             time.sleep(SLEEP_INTERVAL_SECONDS) # Add delay
                         except Exception as e:
                              logger.error(f"Error during Stage 1 (Web) call for '{attribute_key}': {e}", exc_info=True)
                              json_result_str = f'{{"error": "Exception during Stage 1 call: {e}"}}'
                              run_time = time.time() - start_time # Record time even on error
+                             
+                             debug_logger.exception(e, context={
+                                 "step": "stage1_exception",
+                                 "attribute": attribute_key,
+                                 "duration": run_time
+                             })
                 
                 # --- Log the raw output from the web chain ---
                 logger.debug(f"Raw JSON result string from web_chain for '{attribute_key}': {json_result_str}")
+                debug_logger.info(f"Raw output for {attribute_key}", data={
+                    "raw_output": json_result_str,
+                    "output_length": len(json_result_str) if json_result_str else 0
+                }, context={"step": "stage1_raw_output", "attribute": attribute_key})
                 # -----------------------------------------
                 
                 # --- Basic Parsing of Stage 1 Result --- 
@@ -706,11 +822,24 @@ else:
                 try:
                     string_to_parse = raw_output.strip()
                     parsed_json = extract_json_from_string(string_to_parse)
+                    
+                    debug_logger.data_transformation(
+                        f"JSON parsing for {attribute_key}",
+                        string_to_parse,
+                        parsed_json,
+                        context={"step": "stage1_json_parsing", "attribute": attribute_key}
+                    )
+                    
                     if not isinstance(parsed_json, dict):
                         logger.error(f"Stage 1: Parsed JSON is not a dict for '{attribute_key}'. Got: {parsed_json}. Raw: {string_to_parse}")
                         final_answer_value = "Unexpected JSON Type"
                         parse_error = TypeError(f"Stage 1 Expected dict, got {type(parsed_json)}")
                         needs_fallback = True
+                        debug_logger.warning(f"Unexpected JSON type for {attribute_key}", data={
+                            "expected": "dict",
+                            "got": type(parsed_json).__name__,
+                            "parsed_value": parsed_json
+                        }, context={"step": "stage1_parse_error", "attribute": attribute_key})
                     elif attribute_key in parsed_json:
                         parsed_value = str(parsed_json[attribute_key])
                         # Check for NOT FOUND variants 
@@ -718,9 +847,21 @@ else:
                             final_answer_value = "NOT FOUND"
                             needs_fallback = True # Mark for PDF stage
                             logger.info(f"Stage 1 result for '{attribute_key}' is NOT FOUND. Queued for PDF fallback.")
+                            debug_logger.info(f"NOT FOUND for {attribute_key}", data={
+                                "parsed_value": parsed_value,
+                                "needs_fallback": True
+                            }, context={"step": "stage1_not_found", "attribute": attribute_key})
                         else:
                             final_answer_value = parsed_value # Store successful web result
                             logger.success(f"Stage 1 successful for '{attribute_key}' from Web data.")
+                            debug_logger.extraction_step(
+                                attribute_key,
+                                source,
+                                web_input,
+                                final_answer_value,
+                                True,
+                                context={"step": "stage1_success", "attribute": attribute_key}
+                            )
                     elif "error" in parsed_json:
                         error_msg = parsed_json['error']
                         llm_returned_error_msg = error_msg
@@ -728,19 +869,34 @@ else:
                             final_answer_value = "Rate Limit Hit"
                             is_rate_limit = True
                             parse_error = ValueError("Rate limit hit (Web)")
+                            debug_logger.warning(f"Rate limit hit for {attribute_key}", data={
+                                "error_msg": error_msg
+                            }, context={"step": "stage1_rate_limit", "attribute": attribute_key})
                         else:
                             final_answer_value = f"Error: {error_msg[:100]}"
                             parse_error = ValueError(f"Stage 1 Error: {error_msg}")
+                            debug_logger.warning(f"LLM error for {attribute_key}", data={
+                                "error_msg": error_msg
+                            }, context={"step": "stage1_llm_error", "attribute": attribute_key})
                         needs_fallback = True # Also fallback on web chain error
                         logger.warning(f"Stage 1 Error for '{attribute_key}'. Queued for PDF fallback. Error: {error_msg}")
                     else:
                         final_answer_value = "Unexpected JSON Format"
                         parse_error = ValueError(f"Stage 1 Unexpected JSON keys: {list(parsed_json.keys())}")
                         needs_fallback = True # Fallback on unexpected format
+                        debug_logger.warning(f"Unexpected JSON format for {attribute_key}", data={
+                            "found_keys": list(parsed_json.keys()),
+                            "expected_key": attribute_key
+                        }, context={"step": "stage1_unexpected_format", "attribute": attribute_key})
                 except Exception as processing_exc:
                     parse_error = processing_exc
                     final_answer_value = "Processing Error"
                     logger.error(f"Error processing Stage 1 result for '{attribute_key}'. Error: {processing_exc}. Raw: {string_to_parse}")
+                    debug_logger.exception(processing_exc, context={
+                        "step": "stage1_processing_exception",
+                        "attribute": attribute_key,
+                        "raw_output": string_to_parse
+                    })
                 
                 # Store intermediate result (even if NOT FOUND or error)
                 is_error = bool(parse_error) and not is_rate_limit
@@ -763,11 +919,26 @@ else:
                     'Case-Insensitive Match': None
                 }
                 
+                debug_logger.info(f"Stage 1 result stored for {attribute_key}", data={
+                    "final_value": final_answer_value,
+                    "success": is_success_stage1,
+                    "error": is_error,
+                    "not_found": is_not_found_stage1,
+                    "rate_limit": is_rate_limit,
+                    "latency": round(run_time, 2)
+                }, context={"step": "stage1_result_stored", "attribute": attribute_key})
+                
                 if needs_fallback:
                     pdf_fallback_needed.append(prompt_name)
+                    debug_logger.info(f"Added {attribute_key} to PDF fallback list", context={"step": "stage1_fallback_queued", "attribute": attribute_key})
         
         else: # No scraped HTML, all attributes need PDF fallback
             logger.info("No scraped web data available. All attributes will use PDF extraction.")
+            debug_logger.info("No web data, all attributes need PDF fallback", data={
+                "total_attributes": len(prompts_to_run),
+                "fallback_list": list(prompts_to_run.keys())
+            }, context={"step": "stage1_skipped_no_web_data"})
+            
             pdf_fallback_needed = list(prompts_to_run.keys())
             # Populate intermediate results with placeholders indicating skipped web stage
             for prompt_name in pdf_fallback_needed:
@@ -789,11 +960,19 @@ else:
 
         # --- Stage 2: PDF Fallback --- 
         st.info(f"Running Stage 2 (PDF Fallback) for {len(pdf_fallback_needed)} attributes...")
+        debug_logger.info("Starting Stage 2 (PDF Fallback)", data={
+            "fallback_count": len(pdf_fallback_needed),
+            "fallback_attributes": pdf_fallback_needed
+        }, context={"step": "stage2_start"})
+        
         col_index = 0 # Reset column index
         SLEEP_INTERVAL_SECONDS = 0.5 # Potentially longer delay for more complex chain
 
         if not pdf_fallback_needed:
             st.success("Stage 1 extraction successful for all attributes from web data.")
+            debug_logger.info("No PDF fallback needed", data={
+                "reason": "All attributes successful in Stage 1"
+            }, context={"step": "stage2_skipped_all_successful"})
         else:
             for prompt_name in pdf_fallback_needed:
                 attribute_key = prompt_name
@@ -804,11 +983,23 @@ else:
                 run_time = 0.0
                 source = "PDF" # Source for this stage
                 
+                debug_logger.info(f"Processing PDF fallback for: {attribute_key}", data={
+                    "attribute": attribute_key,
+                    "source": source,
+                    "instruction_length": len(pdf_instruction)
+                }, context={"step": "stage2_attribute_start", "attribute": attribute_key})
+                
                 with current_col:
                      with st.spinner(f"Stage 2: Extracting {attribute_key} from PDF Data..."):
                         try:
                             start_time = time.time()
                             # --- Tag-aware context retrieval ---
+                            debug_logger.info(f"Fetching context chunks for {attribute_key}", data={
+                                "part_number": part_number,
+                                "attribute": attribute_key,
+                                "k": 8
+                            }, context={"step": "stage2_context_retrieval", "attribute": attribute_key})
+                            
                             context_chunks = fetch_chunks(
                                 st.session_state.retriever,
                                 part_number,
@@ -816,6 +1007,13 @@ else:
                                 k=8
                             )
                             context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
+                            
+                            debug_logger.info(f"Context retrieved for {attribute_key}", data={
+                                "chunk_count": len(context_chunks) if context_chunks else 0,
+                                "context_length": len(context_text),
+                                "context_preview": context_text[:500]
+                            }, context={"step": "stage2_context_retrieved", "attribute": attribute_key})
+                            
                             logger.debug(f"Context for '{attribute_key}' (part {part_number}): {context_text[:500]}")
                             pdf_input = {
                                 "context": context_text,
@@ -823,17 +1021,41 @@ else:
                                 "attribute_key": attribute_key,
                                 "part_number": part_number if part_number else "Not Provided"
                             }
+                            
+                            debug_logger.llm_request(
+                                f"Extract {attribute_key} from PDF context",
+                                "pdf_chain",
+                                0.7,
+                                1000,
+                                context={"step": "stage2_llm_request", "attribute": attribute_key}
+                            )
+                            
                             # Call helper using the pdf_chain
                             json_result_str = loop.run_until_complete(
                                 _invoke_chain_and_process(st.session_state.pdf_chain, pdf_input, f"{attribute_key} (PDF)")
                             )
                             run_time = time.time() - start_time
+                            
+                            debug_logger.llm_response(
+                                "pdf_chain",
+                                json_result_str if json_result_str else "",
+                                len(json_result_str) if json_result_str else 0,
+                                run_time,
+                                context={"step": "stage2_llm_response", "attribute": attribute_key}
+                            )
+                            
                             logger.info(f"Stage 2 (PDF) for '{attribute_key}' took {run_time:.2f} seconds.")
                             time.sleep(SLEEP_INTERVAL_SECONDS) # Add delay
                         except Exception as e:
                              logger.error(f"Error during Stage 2 (PDF) call for '{attribute_key}': {e}", exc_info=True)
                              json_result_str = f'{{"error": "Exception during Stage 2 call: {e}"}}'
                              run_time = time.time() - start_time
+                             
+                             debug_logger.exception(e, context={
+                                 "step": "stage2_exception",
+                                 "attribute": attribute_key,
+                                 "duration": run_time
+                             })
                 
                 # --- Basic Parsing of Stage 2 Result --- 
                 final_answer_value = "Error"
@@ -842,17 +1064,43 @@ else:
                 llm_returned_error_msg = None
                 raw_output = json_result_str if json_result_str else '{"error": "Stage 2 did not run"}'
                 
+                debug_logger.info(f"Raw output for {attribute_key} (PDF)", data={
+                    "raw_output": json_result_str,
+                    "output_length": len(json_result_str) if json_result_str else 0
+                }, context={"step": "stage2_raw_output", "attribute": attribute_key})
+                
                 try:
                     string_to_parse = raw_output.strip()
                     parsed_json = extract_json_from_string(string_to_parse)
+                    
+                    debug_logger.data_transformation(
+                        f"JSON parsing for {attribute_key} (PDF)",
+                        string_to_parse,
+                        parsed_json,
+                        context={"step": "stage2_json_parsing", "attribute": attribute_key}
+                    )
+                    
                     if not isinstance(parsed_json, dict):
                         logger.error(f"Stage 2: Parsed JSON is not a dict for '{attribute_key}'. Got: {parsed_json}. Raw: {string_to_parse}")
                         final_answer_value = "Unexpected JSON Type"
                         parse_error = TypeError(f"Stage 2 Expected dict, got {type(parsed_json)}")
                         logger.warning(f"Stage 2 Unexpected JSON type for '{attribute_key}'.")
+                        debug_logger.warning(f"Unexpected JSON type for {attribute_key} (PDF)", data={
+                            "expected": "dict",
+                            "got": type(parsed_json).__name__,
+                            "parsed_value": parsed_json
+                        }, context={"step": "stage2_parse_error", "attribute": attribute_key})
                     elif attribute_key in parsed_json:
                         final_answer_value = str(parsed_json[attribute_key]) # Store final PDF result
                         logger.success(f"Stage 2 successful for '{attribute_key}' from PDF data.")
+                        debug_logger.extraction_step(
+                            attribute_key,
+                            source,
+                            pdf_input,
+                            final_answer_value,
+                            True,
+                            context={"step": "stage2_success", "attribute": attribute_key}
+                        )
                     elif "error" in parsed_json:
                         error_msg = parsed_json['error']
                         llm_returned_error_msg = error_msg
@@ -860,18 +1108,33 @@ else:
                             final_answer_value = "Rate Limit Hit"
                             is_rate_limit = True
                             parse_error = ValueError("Rate limit hit (PDF)")
+                            debug_logger.warning(f"Rate limit hit for {attribute_key} (PDF)", data={
+                                "error_msg": error_msg
+                            }, context={"step": "stage2_rate_limit", "attribute": attribute_key})
                         else:
                             final_answer_value = f"Error: {error_msg[:100]}"
                             parse_error = ValueError(f"Stage 2 Error: {error_msg}")
+                            debug_logger.warning(f"LLM error for {attribute_key} (PDF)", data={
+                                "error_msg": error_msg
+                            }, context={"step": "stage2_llm_error", "attribute": attribute_key})
                         logger.warning(f"Stage 2 Error for '{attribute_key}' from PDF. Error: {error_msg}")
                     else:
                         final_answer_value = "Unexpected JSON Format"
                         parse_error = ValueError(f"Stage 2 Unexpected JSON keys: {list(parsed_json.keys())}")
                         logger.warning(f"Stage 2 Unexpected JSON for '{attribute_key}'.")
+                        debug_logger.warning(f"Unexpected JSON format for {attribute_key} (PDF)", data={
+                            "found_keys": list(parsed_json.keys()),
+                            "expected_key": attribute_key
+                        }, context={"step": "stage2_unexpected_format", "attribute": attribute_key})
                 except Exception as processing_exc:
                     parse_error = processing_exc
                     final_answer_value = "Processing Error"
                     logger.error(f"Error processing Stage 2 result for '{attribute_key}'. Error: {processing_exc}. Raw: {string_to_parse}")
+                    debug_logger.exception(processing_exc, context={
+                        "step": "stage2_processing_exception",
+                        "attribute": attribute_key,
+                        "raw_output": string_to_parse
+                    })
 
                 # --- Update the result in intermediate_results with Stage 2 data --- 
                 is_error = bool(parse_error) and not is_rate_limit
@@ -893,11 +1156,33 @@ else:
                     'Is Rate Limit': is_rate_limit,
                     'Latency (s)': total_latency 
                 })
+                
+                debug_logger.info(f"Stage 2 result stored for {attribute_key}", data={
+                    "final_value": final_answer_value,
+                    "success": is_success_stage2,
+                    "error": is_error,
+                    "not_found": is_not_found_stage2,
+                    "rate_limit": is_rate_limit,
+                    "stage1_latency": stage1_latency,
+                    "stage2_latency": round(run_time, 2),
+                    "total_latency": total_latency
+                }, context={"step": "stage2_result_stored", "attribute": attribute_key})
+                
                 logger.info(f"Updated result for '{prompt_name}' with PDF fallback data.")
 
         # --- Final Processing --- 
         # Convert intermediate_results dict to list
         extraction_results_list = list(intermediate_results.values()) 
+        
+        debug_logger.info("Extraction process completed", data={
+            "total_results": len(extraction_results_list),
+            "results_summary": {
+                "success_count": sum(1 for r in extraction_results_list if r.get('Is Success', False)),
+                "error_count": sum(1 for r in extraction_results_list if r.get('Is Error', False)),
+                "not_found_count": sum(1 for r in extraction_results_list if r.get('Is Not Found', False)),
+                "rate_limit_count": sum(1 for r in extraction_results_list if r.get('Is Rate Limit', False))
+            }
+        }, context={"step": "extraction_complete"})
         
         # Set extraction_performed flag and handle success/error messages
         extraction_successful = True # Assume success unless critical errors occurred (e.g., chain init)
@@ -908,6 +1193,11 @@ else:
             st.session_state.extraction_attempts = 0  # Reset counter on success
             logger.info("Extraction completed successfully, setting extraction_performed=True")
             st.success("Extraction complete (using Web data where possible, falling back to PDF). Enter ground truth below.")
+            
+            debug_logger.session_state("evaluation_results", extraction_results_list, context={"step": "results_stored"})
+            debug_logger.session_state("extraction_performed", True, context={"step": "extraction_flag_set"})
+            debug_logger.session_state("extraction_attempts", 0, context={"step": "attempts_reset"})
+            debug_logger.info("Extraction completed successfully", context={"step": "extraction_success"})
             # st.rerun() # REMOVE/COMMENT OUT to keep cards visible
         else:
             st.error("Extraction process encountered critical issues.")
@@ -916,18 +1206,35 @@ else:
             st.session_state.extraction_performed = True
             st.session_state.extraction_attempts = 0  # Reset counter even on error
             logger.info("Extraction completed with issues, setting extraction_performed=True")
+            
+            debug_logger.warning("Extraction completed with issues", data={
+                "results_count": len(extraction_results_list)
+            }, context={"step": "extraction_with_issues"})
             # st.rerun() # REMOVE/COMMENT OUT to keep cards visible (even on error)
 
 
     # --- Block 2: Display Ground Truth / Metrics (if results exist) ---
     # This part needs the 'Source' column re-added for display
     if st.session_state.evaluation_results:
+        debug_logger.info("Displaying evaluation results", data={
+            "results_count": len(st.session_state.evaluation_results)
+        }, context={"step": "display_results"})
+        
         st.divider()
         st.header("3. Enter Ground Truth & Evaluate")
 
         results_df = pd.DataFrame(st.session_state.evaluation_results)
+        
+        debug_logger.data_transformation(
+            "Results DataFrame creation",
+            st.session_state.evaluation_results,
+            results_df.to_dict('records'),
+            context={"step": "results_dataframe_created"}
+        )
+        
         if 'Source' not in results_df.columns:
              results_df['Source'] = 'Unknown' # Add placeholder if missing
+             debug_logger.warning("Source column missing, added placeholder", context={"step": "source_column_fixed"})
 
         st.info("Enter the correct 'Ground Truth' value for each field below. Leave blank if the field shouldn't exist or 'NOT FOUND' is correct.")
 
@@ -961,163 +1268,15 @@ else:
                  "Parse Error": None
             }
         )
+        
+        debug_logger.user_action("Data editor displayed", data={
+            "df_shape": edited_df.shape,
+            "columns": list(edited_df.columns)
+        }, context={"step": "data_editor_displayed"})
 
-        # --- Horizontal Card Layout for Each Attribute ---
-        st.subheader("📋 Extracted Attributes Overview")
-
-        cards_html = '<div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0;">'
-
-        for _, row in edited_df.iterrows():
-            prompt_name = row['Prompt Name']
-            extracted_value = str(row['Extracted Value'])
-            cards_html += f'<div style="background: #f8f9fa; border: 2px solid #1e3c72; border-radius: 10px; padding: 0.5rem 1rem; min-width: 100px; text-align: center; font-weight: bold; box-shadow: 0 2px 8px rgba(30, 60, 114, 0.06);"><div style="color: #1e3c72; font-size: 0.9em; margin-bottom: 0.3em;">{prompt_name}</div><div style="font-size: 1em;">{extracted_value}</div></div>'
-
-        cards_html += '</div>'
-
-        st.markdown(cards_html, unsafe_allow_html=True)
-
-        calculate_button = st.button("📊 Calculate Metrics", key="calc_metrics", type="primary")
-
-        if calculate_button:
-            # --- Metric Calculation Logic --- 
-            final_results_list = edited_df.to_dict('records')
-            total_fields = len(final_results_list)
-            success_count = 0
-            error_count = 0
-            not_found_count = 0 # Counts final NOT FOUND results
-            rate_limit_count = 0
-            exact_match_count = 0
-            case_insensitive_match_count = 0
-            total_latency = 0.0
-            valid_latency_count = 0 # Count fields where latency is meaningful
-
-            for result in final_results_list:
-                extracted = str(result['Extracted Value']).strip()
-                ground_truth = str(result['Ground Truth']).strip()
-
-                # Normalize "NOT FOUND" variations for comparison
-                # Handle the placeholder from skipped web stage
-                if extracted == "(Web Stage Skipped)":
-                    extracted_norm = "NOT FOUND" # Treat skipped as NOT FOUND for comparison
-                else:
-                    extracted_norm = "NOT FOUND" if "not found" in extracted.lower() else extracted
-                gt_norm = "NOT FOUND" if "not found" in ground_truth.lower() else ground_truth
-                gt_norm = "NOT FOUND" if ground_truth == "" else gt_norm # Treat empty GT as NOT FOUND
-
-                # Calculate matches
-                is_exact_match = False
-                is_case_insensitive_match = False
-
-                # Only calculate accuracy if not an error/rate limit and GT provided
-                # Also exclude the placeholder value from accuracy calculation
-                if not result['Is Error'] and not result['Is Rate Limit'] and extracted != "(Web Stage Skipped)":
-                    if extracted_norm == gt_norm:
-                        is_exact_match = True
-                        is_case_insensitive_match = True # Exact implies case-insensitive
-                        if gt_norm != "NOT FOUND": # Count matches only if GT wasn't NOT FOUND
-                            exact_match_count += 1
-                            case_insensitive_match_count += 1
-                    elif extracted_norm.lower() == gt_norm.lower():
-                        is_case_insensitive_match = True
-                        if gt_norm != "NOT FOUND":
-                             case_insensitive_match_count += 1
-
-                result['Exact Match'] = is_exact_match
-                result['Case-Insensitive Match'] = is_case_insensitive_match
-
-                # Count outcomes (based on final result)
-                if result['Is Success']: success_count += 1
-                if result['Is Error']: error_count += 1
-                if result['Is Not Found']: not_found_count += 1
-                if result['Is Rate Limit']: rate_limit_count += 1
-
-                # Sum latency
-                if isinstance(result['Latency (s)'], (int, float)):
-                    total_latency += result['Latency (s)']
-                    valid_latency_count += 1
-
-
-            # Calculate overall metrics
-            # Adjust denominator: fields where accuracy could be measured
-            # Exclude errors, rate limits, and final NOT FOUND results
-            accuracy_denominator = total_fields - error_count - rate_limit_count - not_found_count
-
-            st.session_state.evaluation_metrics = {
-                "Total Fields": total_fields,
-                "Success Count": success_count,
-                "Error Count": error_count,
-                "Not Found Count (Final)": not_found_count, # Renamed for clarity
-                "Rate Limit Count": rate_limit_count,
-                "Exact Match Count": exact_match_count,
-                "Case-Insensitive Match Count": case_insensitive_match_count,
-                "Accuracy Denominator": accuracy_denominator,
-                "Success Rate (%)": (success_count / total_fields * 100) if total_fields > 0 else 0,
-                "Error Rate (%)": (error_count / total_fields * 100) if total_fields > 0 else 0,
-                "Not Found Rate (%)": (not_found_count / total_fields * 100) if total_fields > 0 else 0,
-                "Rate Limit Rate (%)": (rate_limit_count / total_fields * 100) if total_fields > 0 else 0,
-                "Exact Match Accuracy (%)": (exact_match_count / accuracy_denominator * 100) if accuracy_denominator > 0 else 0,
-                "Case-Insensitive Accuracy (%)": (case_insensitive_match_count / accuracy_denominator * 100) if accuracy_denominator > 0 else 0,
-                "Average Latency (s)": (total_latency / valid_latency_count) if valid_latency_count > 0 else 0,
-            }
-
-            # Update the main results list with comparison outcomes
-            st.session_state.evaluation_results = final_results_list
-            st.success("Metrics calculated successfully!")
-            # st.rerun() # REMOVE/COMMENT OUT to keep cards visible
-
-        # --- Display Metrics Section --- 
-        st.divider()
-        st.header("4. Evaluation Metrics")
-        if st.session_state.evaluation_metrics:
-            metrics = st.session_state.evaluation_metrics
-            st.subheader("Summary Statistics")
-
-            m_cols = st.columns(4)
-            m_cols[0].metric("Total Fields", metrics["Total Fields"])
-            m_cols[1].metric("Success Rate", f"{metrics['Success Rate (%)']:.1f}%", delta=f"{metrics['Success Count']} fields", delta_color="off")
-            m_cols[2].metric("Error Rate", f"{metrics['Error Rate (%)']:.1f}%", delta=f"{metrics['Error Count']} fields", delta_color="inverse" if metrics['Error Count'] > 0 else "off")
-            # Clarify latency delta
-            valid_calls = metrics["Total Fields"] - metrics["Rate Limit Count"]
-            m_cols[3].metric("Avg Latency", f"{metrics['Average Latency (s)']:.2f}s", delta=f"over {valid_calls} calls", delta_color="off")
-
-            m_cols2 = st.columns(4)
-            # Use the accuracy denominator in help text
-            m_cols2[0].metric("Exact Match Acc.", f"{metrics['Exact Match Accuracy (%)']:.1f}%", help=f"Based on {metrics['Accuracy Denominator']} fields (excluding errors, rate limits, and final 'NOT FOUND' results)")
-            m_cols2[1].metric("Case-Insensitive Acc.", f"{metrics['Case-Insensitive Accuracy (%)']:.1f}%")
-            m_cols2[2].metric("Final 'NOT FOUND' Rate", f"{metrics['Not Found Rate (%)']:.1f}%", delta=f"{metrics['Not Found Count (Final)']} fields", delta_color="off")
-            m_cols2[3].metric("Rate Limit Hits", f"{metrics['Rate Limit Count']}", delta_color="inverse" if metrics['Rate Limit Count'] > 0 else "off")
-
-
-            st.subheader("Detailed Results")
-            # Display final results including Source
-            detailed_df = pd.DataFrame(st.session_state.evaluation_results)
-            if 'Source' not in detailed_df.columns:
-                 detailed_df['Source'] = 'Unknown'
-
-            st.dataframe(
-                detailed_df,
-                use_container_width=True,
-                hide_index=True,
-                 column_config={ # Add Source back
-                     "Prompt Name": st.column_config.TextColumn(width="medium"),
-                     "Extracted Value": st.column_config.TextColumn(width="medium"),
-                     "Ground Truth": st.column_config.TextColumn(width="medium"),
-                     "Source": st.column_config.TextColumn(width="small"), # Show source
-                     "Is Success": st.column_config.CheckboxColumn("Success?",width="small"),
-                     "Is Error": st.column_config.CheckboxColumn("Error?", width="small"),
-                     "Is Not Found": st.column_config.CheckboxColumn("Not Found?", width="small"),
-                     "Is Rate Limit": st.column_config.CheckboxColumn("Rate Limit?", width="small"),
-                     "Latency (s)": st.column_config.NumberColumn(format="%.2f", width="small"),
-                     "Exact Match": st.column_config.CheckboxColumn("Exact?", width="small"),
-                     "Case-Insensitive Match": st.column_config.CheckboxColumn("Case-Ins?", width="small"),
-                     "Raw Output": st.column_config.TextColumn("Raw Output", width="large"),
-                     "Parse Error": st.column_config.TextColumn("Parse Error", width="medium")
-                }
-            )
-
-        else:
-            st.info("Calculate metrics after entering ground truth to see results here.")
-
+        # --- Mini Debug Widget ---
+        from debug_interface import create_mini_debug_widget
+        create_mini_debug_widget()
 
         # --- Export Section --- 
         st.divider()
