@@ -95,7 +95,10 @@ def setup_vector_store(
 
         logger.success(f"Vector store '{collection_name}' created/updated and persisted successfully.")
         # Return the retriever
-        return vector_store.as_retriever(search_kwargs={"k": config.RETRIEVER_K})
+        return vector_store.as_retriever(search_kwargs={
+            "k": config.RETRIEVER_K,
+            "score_threshold": config.VECTOR_SIMILARITY_THRESHOLD
+        })
 
     except Exception as e:
         logger.error(f"Failed to create or populate Chroma vector store '{collection_name}': {e}", exc_info=True)
@@ -143,7 +146,10 @@ def load_existing_vector_store(embedding_function) -> Optional[VectorStoreRetrie
         #      logger.warning(f"Loaded collection '{collection_name}', but could not verify item count.")
 
         logger.success(f"Successfully loaded vector store '{collection_name}'.")
-        return vector_store.as_retriever(search_kwargs={"k": config.RETRIEVER_K})
+        return vector_store.as_retriever(search_kwargs={
+            "k": config.RETRIEVER_K,
+            "score_threshold": config.VECTOR_SIMILARITY_THRESHOLD
+        })
 
     except Exception as e:
         # This exception block might catch cases where the collection *within* the directory doesn't exist

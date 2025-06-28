@@ -59,6 +59,33 @@ def format_docs(docs: List[Document]) -> str:
         )
     return "\n\n---\n\n".join(context_parts)
 
+def retrieve_and_log_chunks(retriever, query: str, attribute_key: str):
+    """Retrieves chunks from the retriever and logs them for debugging."""
+    logger.info(f"🔍 RETRIEVING CHUNKS for attribute '{attribute_key}' with query: '{query}'")
+    
+    try:
+        chunks = retriever.invoke(query)
+        
+        if not chunks:
+            logger.warning(f"❌ No chunks retrieved for attribute '{attribute_key}'")
+            return []
+        
+        logger.info(f"✅ Retrieved {len(chunks)} chunks for attribute '{attribute_key}':")
+        
+        for i, chunk in enumerate(chunks):
+            source = chunk.metadata.get('source', 'Unknown')
+            page = chunk.metadata.get('page', 'N/A')
+            start_index = chunk.metadata.get('start_index', 'N/A')
+            
+            logger.info(f"  📄 Chunk {i+1}: Source='{source}', Page={page}, StartIndex={start_index}")
+            logger.info(f"     Content: {chunk.page_content[:200]}{'...' if len(chunk.page_content) > 200 else ''}")
+        
+        return chunks
+        
+    except Exception as e:
+        logger.error(f"❌ Error retrieving chunks for attribute '{attribute_key}': {e}")
+        return []
+
 @logger.catch(reraise=True)
 def get_answer_from_llm_langchain(question: str, retriever: VectorStoreRetriever) -> Optional[str]:
     """
@@ -447,7 +474,7 @@ Output:
     # Chain uses retriever to get PDF context
     pdf_chain = (
         RunnableParallel(
-            context=RunnablePassthrough() | (lambda x: retriever.invoke(f"Extract information about {x['attribute_key']} for part number {x.get('part_number', 'N/A')}")) | format_docs,
+            context=RunnablePassthrough() | (lambda x: retrieve_and_log_chunks(retriever, f"Extract information about {x['attribute_key']} for part number {x.get('part_number', 'N/A')}", x['attribute_key'])) | format_docs,
             extraction_instructions=RunnablePassthrough(),
             attribute_key=RunnablePassthrough(),
             part_number=RunnablePassthrough()
