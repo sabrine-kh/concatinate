@@ -186,11 +186,11 @@ class ThresholdRetriever(VectorStoreRetriever):
         for doc, score in docs_and_scores:
             if score >= self.threshold:
                 filtered_docs.append(doc)
-                logger.debug(f"✅ Chunk passed threshold (score: {score:.3f}): {doc.page_content[:100]}...")
+                logger.debug("Chunk passed threshold (score: {:.3f}): {}".format(score, doc.page_content[:100]))
             else:
-                logger.debug(f"❌ Chunk below threshold (score: {score:.3f}): {doc.page_content[:100]}...")
+                logger.debug("Chunk below threshold (score: {:.3f}): {}".format(score, doc.page_content[:100]))
         
-        logger.info(f"Retrieved {len(docs_and_scores)} chunks, {len(filtered_docs)} passed threshold {self.threshold}")
+        logger.info("Retrieved {} chunks, {} passed threshold {}".format(len(docs_and_scores), len(filtered_docs), self.threshold))
         return filtered_docs
     
     async def _aget_relevant_documents(self, query: str) -> List[Document]:
