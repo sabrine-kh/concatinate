@@ -929,7 +929,7 @@ Identify approved contact systems using this reasoning chain:
 
     STEP 1: SOURCE IDENTIFICATION
     - Scan for:
-      ✓ Explicit system families (MQS, MLK, SLK, etc.)
+      ✓ Explicit system families ("TAB 1.8", "0.64", "MCP 2.8", "MLK 1.2", "MQS 0.64", "SLK 2.8", "HF", "070", "GT 2.8", "MTS 0.64", "NG 1.8", "2.3", "BOX 2.8", "QKK 2.8", "RH 0.64", "CTS 1.5", "NanoMQS", "MCON 1.2", "HSD", "RK", "YESC 1.5", "MCP 1.5K", "HCT4", "HPCS 2.8", "2.8", "040", "SPT 4.8", "090 HW", "AMPSEAL", "MOD", "ST", "CONI1 1.6", "Econoseal 1.5", "MCP 1.2", "TAB 1.2", "FASTON 6.3", "M800", "GET 0.64", "MATE-N-LOK", "025 TH", "MPQ 2.8", "MAK 8", "MAK 2.8", "TAB 1.5", "DIA 3.6", "DIA 9.0", "DIA 6.0", "DIA 3.0", "TAB 1.6", "QKK 4.8", "FS 2.8", "FS 1.2", "US 2.8x0.8", "TAB 2.8", "TAB 4.8", "TAB 9.5", "3.5", "MCP 6.3", "MX 1.5", "1.5", "1.2", "QKK 1.2", "MLK 1.2 Sm", "MCP 1.5", "MQS 1.5", "MQS 0.64 CB")
       ✓ Terminal part numbers (123-4567, XW3D-XXXX-XX)
       ✓ Manufacturer approval statements:
         * \"Approved for use with...\"
