@@ -192,8 +192,16 @@ class ThresholdRetriever:
         logger.info("Retrieved {} chunks, {} passed threshold {}".format(len(docs_and_scores), len(filtered_docs), self.threshold))
         return filtered_docs
     
+    def get_relevant_documents(self, query: str) -> List[Document]:
+        """LangChain compatibility method - same as invoke."""
+        return self.invoke(query)
+    
     async def ainvoke(self, query: str) -> List[Document]:
         """Async version of document retrieval."""
+        return self.invoke(query)
+    
+    async def aget_relevant_documents(self, query: str) -> List[Document]:
+        """Async LangChain compatibility method."""
         return self.invoke(query)
 
 # Add this import at the top of vector_store.py
