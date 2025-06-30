@@ -440,7 +440,7 @@ Conversation history:
 {history}
 User Question: {prompt}
 
-Answer the user question based *only* on the provided context and the conversation history."""
+When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. Answer the user question based *only* on the provided context and the conversation history."""
                 llm_response = get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
                 
                 # Display the response
