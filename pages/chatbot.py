@@ -58,6 +58,10 @@ with st.sidebar:
         st.switch_page("pages/chatbot.py")
     if st.button("📄 Extract a new Part"):
         st.switch_page("pages/extraction_attributs.py")
+    if st.button("🆕 Nouvelle conversation"):
+        st.session_state.messages = []
+        st.session_state.last_part_number = None
+        st.experimental_rerun()
 
 # Add navigation button at the top
 if st.sidebar.button("← Back to Main App", use_container_width=True):
@@ -382,11 +386,6 @@ def get_groq_chat_response(prompt, context_provided=True):
 
 leoni_attributes_schema_for_main_loop = """(id: bigint, Number: text, Name: text, "Object Type Indicator": text, Context: text, Version: text, State: text, "Last Modified": timestamp with time zone, "Created On": timestamp with time zone, "Sourcing Status": text, "Material Filling": text, "Material Name": text, "Max. Working Temperature [°C]": numeric, "Min. Working Temperature [°C]": numeric, Colour: text, "Contact Systems": text, Gender: text, "Housing Seal": text, "HV Qualified": text, "Length [mm]": numeric, "Mechanical Coding": text, "Number Of Cavities": numeric, "Number Of Rows": numeric, "Pre-assembled": text, Sealing: text, "Sealing Class": text, "Terminal Position Assurance": text, "Type Of Connector": text, "Width [mm]": numeric, "Wire Seal": text, "Connector Position Assurance": text, "Colour Coding": text, "Set/Kit": text, "Name Of Closed Cavities": text, "Pull-To-Seat": text, "Height [mm]": numeric, Classification: text)"""
 
-# Ajout du bouton "Nouvelle conversation"
-if st.button("🆕 Nouvelle conversation"):
-    st.session_state.messages = []
-    st.experimental_rerun()
-
 def extract_part_number(text):
     """Extrait un numéro de pièce commençant par P et suivi de chiffres (ex: P00739119)"""
     match = re.search(r'\bP\d{8,}\b', text)
@@ -474,9 +473,9 @@ When answering, always use the conversation history to resolve references (such 
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": llm_response})
 
-                st.write("SQL générée :", generated_sql)
-                st.write("Contexte envoyé au modèle :")
-                st.write(context_str)
+                print("SQL générée :", generated_sql)
+                print("Contexte envoyé au modèle :")
+                print(context_str)
 
 # The chatbot will be called from app.py
 if __name__ == "__main__":
