@@ -450,6 +450,10 @@ When answering, always use the conversation history to resolve references (such 
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": llm_response})
 
+                st.write("SQL générée :", generated_sql)
+                st.write("Contexte envoyé au modèle :")
+                st.write(context_str)
+
 # The chatbot will be called from app.py
 if __name__ == "__main__":
     run_chatbot() 
