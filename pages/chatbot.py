@@ -222,7 +222,12 @@ Strictly adhere to the following rules:
    - Use `ILIKE` with surrounding wildcards (`%`) (e.g., `'%variation%'`) for case-insensitive, substring matching for every term and variation.
    - Combine **ALL** these individual search conditions (original + all variations across all relevant columns) using the `OR` operator. This might result in a long WHERE clause, which is expected.
 6. **LIMIT Clause**: Use `LIMIT 3` for specific part number lookups. Use `LIMIT 10` (or maybe `LIMIT 20` if many variations are generated) for broader keyword searches to provide a reasonable sample.
-7. **NO_SQL**: Return NO_SQL for general knowledge questions, requests outside the table's scope, or highly ambiguous queries.
+7. **YEAR FILTERS**:
+   - If the user's question contains any standalone four-digit number between 1900 and 2100, treat that token as a creation-year.
+   - In that case, add  
+       `EXTRACT(YEAR FROM "Created On") = <that year>`  
+     to your WHERE clause automatically (alongside any other filters).
+8. **NO_SQL**: Return NO_SQL for general knowledge questions, requests outside the table's scope, or highly ambiguous queries.
 
 Table Schema: "Leoni_attributes"
 {table_schema}
@@ -248,6 +253,13 @@ SQL Query: SELECT "Number", "Number Of Cavities" FROM "Leoni_attributes" WHERE "
 
 User Question: "What is a TPA?"
 SQL Query: NO_SQL
+
+User Question: "Which parts date back to 2017?"
+SQL Query:
+SELECT "Number", "Created On"
+FROM "Leoni_attributes"
+WHERE EXTRACT(YEAR FROM "Created On") = 2017
+LIMIT 10;
 
 User Question: "{user_query}"
 SQL Query:
