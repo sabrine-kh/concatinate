@@ -211,6 +211,7 @@ Strictly adhere to the following rules:
    - Select columns explicitly asked for or implied by the user's condition.
    - Always include the columns involved in the WHERE clause conditions for verification.
    - Use `SELECT *` for requests about a specific part number.
+   - Always include the "Sourcing Status" column in the SELECT clause if the user asks about approval, sourcing, or status, or if the question may be followed by such a request.
 5. **Robust Keyword Searching (CRITICAL RULE)**:
    - Identify the main descriptive keyword(s) in the user's question (e.g., colors, materials, types like 'black', 'connector', 'grey', 'terminal'). Do NOT apply this robust search to specific identifiers like part numbers unless the user query implies a pattern search (e.g., 'starts with...').
    - For the identified keyword(s), generate a comprehensive list of **potential variations**:
