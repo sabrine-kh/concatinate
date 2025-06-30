@@ -387,6 +387,13 @@ if st.button("🆕 Nouvelle conversation"):
     st.session_state.messages = []
     st.experimental_rerun()
 
+def extract_part_number(text):
+    """Extrait un numéro de pièce commençant par P et suivi de chiffres (ex: P00739119)"""
+    match = re.search(r'\bP\d{8,}\b', text)
+    if match:
+        return match.group(0)
+    return None
+
 def run_chatbot():
     st.title("🤖 Chatbot")
     st.markdown("Ask questions about the extracted data.")
@@ -394,6 +401,9 @@ def run_chatbot():
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    # Initialiser la mémoire du dernier numéro de pièce
+    if "last_part_number" not in st.session_state:
+        st.session_state.last_part_number = None
 
     # Display chat history
     for message in st.session_state.messages:
@@ -402,6 +412,11 @@ def run_chatbot():
 
     # Chat input
     if prompt := st.chat_input("What would you like to know?"):
+        # Détecter un numéro de pièce dans la question
+        part_number = extract_part_number(prompt)
+        if part_number:
+            st.session_state.last_part_number = part_number
+
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -415,7 +430,16 @@ def run_chatbot():
                 generated_sql = None
 
                 # 1. Attempt Text-to-SQL generation
-                generated_sql = generate_sql_from_query(prompt, leoni_attributes_schema_for_main_loop)
+                # Si la question semble concerner les attributs et ne contient pas de numéro de pièce, compléter avec le dernier connu
+                prompt_for_sql = prompt
+                if (
+                    ("part number" in prompt.lower() or "state" in prompt.lower() or "approved" in prompt.lower() or "sourcing status" in prompt.lower())
+                    and not extract_part_number(prompt)
+                    and st.session_state.last_part_number
+                ):
+                    prompt_for_sql = f"{prompt} (about part number {st.session_state.last_part_number})"
+
+                generated_sql = generate_sql_from_query(prompt_for_sql, leoni_attributes_schema_for_main_loop)
 
                 # 2. Execute SQL (using client-side filters)
                 if generated_sql:
