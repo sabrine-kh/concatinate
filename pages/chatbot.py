@@ -543,13 +543,12 @@ def run_chatbot():
                 st.info(f"[LOG] User question: {prompt}")
                 agent_result = agent.run(prompt)
                 st.info(f"[LOG] Agent raw result: {agent_result}")
-                # agent_result is a dict with keys 'type' and 'data'
+                # agent_result is a dict with keys 'type' and 'data', or a string (direct answer)
                 if isinstance(agent_result, str):
-                    # If the tool returns a string (shouldn't, but fallback)
-                    combined_context = agent_result
-                    relevant_attribute_rows = []
-                    relevant_markdown_chunks = []
-                    st.info(f"[LOG] Agent returned a string (unexpected)")
+                    st.markdown(agent_result)
+                    st.session_state.messages.append({"role": "assistant", "content": agent_result})
+                    st.info("[LOG] Agent returned a string (final answer shown directly)")
+                    return  # Stop further processing if direct answer
                 elif isinstance(agent_result, dict):
                     tool_type = agent_result.get("type")
                     st.info(f"[LOG] Agent selected tool: {tool_type}")
