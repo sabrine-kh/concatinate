@@ -58,7 +58,7 @@ with st.sidebar:
         st.switch_page("pages/chatbot.py")
     if st.button("📄 Extract a new Part"):
         st.switch_page("pages/extraction_attributs.py")
-    if st.button("🆕 Nouvelle conversation"):
+    if st.button("🆕 New conversation"):
         st.session_state.messages = []
         st.session_state.last_part_number = None
         st.rerun()
@@ -381,6 +381,57 @@ def get_groq_chat_response(prompt, context_provided=True):
         return "Error contacting LLM."
 
 # ───────────────────────────────────────────────────────────────────────────
+#  VECTOR SEARCH FOR MARKDOWN CHUNKS
+# ───────────────────────────────────────────────────────────────────────────
+def find_relevant_markdown_chunks(user_query: str, limit: int = 5):
+    """
+    Searches for relevant markdown chunks using vector similarity.
+    Returns List[dict] with chunk content and metadata.
+    """
+    if not user_query:
+        return []
+    
+    try:
+        # Generate embedding for the query
+        query_embedding = get_query_embedding(user_query)
+        if not query_embedding:
+            return []
+        
+        # Call the RPC function to find similar chunks
+        response = supabase.rpc(
+            RPC_FUNCTION_NAME,
+            {
+                "query_embedding": query_embedding,
+                "match_threshold": VECTOR_SIMILARITY_THRESHOLD,
+                "match_count": limit
+            }
+        ).execute()
+        
+        if not response.data:
+            return []
+        
+        return response.data
+        
+    except Exception as e:
+        st.error(f"Error searching markdown chunks: {e}")
+        return []
+
+def format_markdown_context(markdown_chunks):
+    """Formats markdown chunks into a readable context string."""
+    if not markdown_chunks:
+        return "No relevant markdown content found."
+    
+    context_parts = []
+    for i, chunk in enumerate(markdown_chunks):
+        content = chunk.get('content', '')
+        source = chunk.get('source', 'Unknown')
+        page = chunk.get('page', 'N/A')
+        
+        context_parts.append(f"--- Markdown Chunk {i+1} (Source: {source}, Page: {page}) ---\n{content}")
+    
+    return "\n\n".join(context_parts)
+
+# ───────────────────────────────────────────────────────────────────────────
 #  MAIN CHAT LOOP
 # ───────────────────────────────────────────────────────────────────────────
 
@@ -425,10 +476,11 @@ def run_chatbot():
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 relevant_attribute_rows = []
+                relevant_markdown_chunks = []
                 context_was_found = False
                 generated_sql = None
 
-                # 1. Attempt Text-to-SQL generation
+                # 1. Attempt Text-to-SQL generation for attributes
                 # Si la question semble concerner les attributs et ne contient pas de numéro de pièce, compléter avec le dernier connu
                 prompt_for_sql = prompt
                 if (
@@ -440,14 +492,30 @@ def run_chatbot():
 
                 generated_sql = generate_sql_from_query(prompt_for_sql, leoni_attributes_schema_for_main_loop)
 
-                # 2. Execute SQL (using client-side filters)
+                # 2. Execute SQL for attributes
                 if generated_sql:
                     relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
                     if relevant_attribute_rows:
                         context_was_found = True
 
-                # 4. Prepare Context
-                context_str = format_context(relevant_attribute_rows)
+                # 3. Search markdown chunks using vector similarity
+                relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
+                if relevant_markdown_chunks:
+                    context_was_found = True
+
+                # 4. Prepare combined context
+                attribute_context = format_context(relevant_attribute_rows)
+                markdown_context = format_markdown_context(relevant_markdown_chunks)
+                
+                # Combine both contexts
+                combined_context = ""
+                if relevant_attribute_rows:
+                    combined_context += f"**Database Attributes Information:**\n{attribute_context}\n\n"
+                if relevant_markdown_chunks:
+                    combined_context += f"**Documentation/Standards Information:**\n{markdown_context}\n\n"
+                
+                if not combined_context:
+                    combined_context = "No relevant information found in the knowledge base (attributes or documentation)."
 
                 # 4.1. Préparer l'historique de la conversation (5 derniers échanges)
                 history = ""
@@ -458,13 +526,13 @@ def run_chatbot():
 
                 # 5. Generate Response
                 prompt_for_llm = f"""Context:
-{context_str}
+{combined_context}
 
 Conversation history:
 {history}
 User Question: {prompt}
 
-When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. Answer the user question based *only* on the provided context and the conversation history."""
+When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. Answer the user question based *only* on the provided context and the conversation history. If you have information from both database attributes and documentation, synthesize them to provide a comprehensive answer."""
                 llm_response = get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
                 
                 # Display the response
@@ -475,7 +543,7 @@ When answering, always use the conversation history to resolve references (such 
 
                 print("SQL générée :", generated_sql)
                 print("Contexte envoyé au modèle :")
-                print(context_str)
+                print(combined_context)
 
 # The chatbot will be called from app.py
 if __name__ == "__main__":
