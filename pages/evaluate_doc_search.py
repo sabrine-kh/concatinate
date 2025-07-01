@@ -5,29 +5,11 @@ from pages.chatbot import find_relevant_markdown_chunks
 from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 
-# Initialize wandb FIRST, before any other code
-wandb.init(project="leoparts-doc-search-eval")
-
 # Authenticate wandb using Streamlit secrets
 os.environ["WANDB_API_KEY"] = st.secrets["WANDB_API_KEY"]
-wandb.login(key=os.environ["WANDB_API_KEY"])
 
 st.title("Document Search Evaluation with wandb")
 st.write("This page evaluates your document search using the provided ground truth and logs results to wandb.")
-
-# --- Supabase connection test ---
-supabase_url = st.secrets["SUPABASE_URL"]
-supabase_key = st.secrets["SUPABASE_SERVICE_KEY"]
-supabase = create_client(supabase_url, supabase_key)
-
-st.subheader("Supabase Connection Test")
-try:
-    data = supabase.table("markdown_chunks").select("*").limit(1).execute()
-    st.success(f"Sample data from markdown_chunks: {data.data}")
-    wandb.log({"supabase_table_test": str(data.data)})
-except Exception as e:
-    st.error(f"Error fetching from markdown_chunks: {e}")
-    wandb.log({"supabase_table_test_error": str(e)})
 
 # --- Ground truth ---
 ground_truth = [
@@ -70,6 +52,31 @@ ground_truth = [
 ]
 
 if st.button("Run Evaluation"):
+    # Initialize wandb and login at the start of evaluation
+    try:
+        wandb.login(key=os.environ["WANDB_API_KEY"])
+        wandb.init(project="leoparts-doc-search-eval")
+        wandb_initialized = True
+    except Exception as e:
+        st.error(f"Failed to initialize wandb: {e}")
+        wandb_initialized = False
+    
+    # --- Supabase connection test ---
+    supabase_url = st.secrets["SUPABASE_URL"]
+    supabase_key = st.secrets["SUPABASE_SERVICE_KEY"]
+    supabase = create_client(supabase_url, supabase_key)
+
+    st.subheader("Supabase Connection Test")
+    try:
+        data = supabase.table("markdown_chunks").select("*").limit(1).execute()
+        st.success(f"Sample data from markdown_chunks: {data.data}")
+        if wandb_initialized:
+            wandb.log({"supabase_table_test": str(data.data)})
+    except Exception as e:
+        st.error(f"Error fetching from markdown_chunks: {e}")
+        if wandb_initialized:
+            wandb.log({"supabase_table_test_error": str(e)})
+    
     model = SentenceTransformer("all-MiniLM-L6-v2")
     hits = 0
     results = []
@@ -92,24 +99,27 @@ if st.button("Run Evaluation"):
                 "similarity": similarity,
                 "hit": hit
             })
-            wandb.log({
-                "question": question,
-                "expected_answer": expected_answer,
-                "retrieved_text": retrieved_text,
-                "similarity": similarity,
-                "hit": hit
-            })
+            if wandb_initialized:
+                wandb.log({
+                    "question": question,
+                    "expected_answer": expected_answer,
+                    "retrieved_text": retrieved_text,
+                    "similarity": similarity,
+                    "hit": hit
+                })
             st.write(f"**Q:** {question}")
             st.write(f"**Similarity:** {similarity:.2f} | **Hit:** {hit}")
             st.write(f"**Retrieved Text:**\n{retrieved_text}")
             st.write("---")
         except Exception as e:
             st.error(f"Error for question '{question}': {e}")
-            wandb.log({"error": f"{question}: {e}"})
+            if wandb_initialized:
+                wandb.log({"error": f"{question}: {e}"})
         progress.progress((idx + 1) / len(ground_truth))
     accuracy = hits / len(ground_truth)
-    wandb.log({"accuracy": accuracy})
-    wandb.finish()
+    if wandb_initialized:
+        wandb.log({"accuracy": accuracy})
+        wandb.finish()
     st.success(f"Evaluation complete! Accuracy: {accuracy:.2f}")
 
 with st.sidebar:
