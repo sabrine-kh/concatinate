@@ -108,3 +108,18 @@ if st.button("Run Evaluation"):
     wandb.log({"accuracy": accuracy})
     wandb.finish()
     st.success(f"Evaluation complete! Accuracy: {accuracy:.2f}")
+
+with st.sidebar:
+    st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
+    if st.button("🏠 Home"):
+        st.switch_page("app.py")
+    if st.button("💬 Chat with Leoparts"):
+        st.switch_page("pages/chatbot.py")
+    if st.button("📄 Extract a new Part"):
+        st.switch_page("pages/extraction_attributs.py")
+    if st.button("🆕 New conversation"):
+        st.session_state.messages = []
+        st.session_state.last_part_number = None
+        st.rerun()
+    if st.button("📊 Evaluate Doc Search"):
+        st.switch_page("pages/evaluate_doc_search.py")
