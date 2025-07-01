@@ -562,6 +562,11 @@ def run_chatbot():
                 for message in st.session_state.messages[-10:-1]:
                     role = "User" if message["role"] == "user" else "Assistant"
                     history += f"{role}: {message['content']}\n"
+                # Add conditional instruction for table vs. plain text
+                if relevant_attribute_rows:
+                    extra_instruction = "If the context is a table of attributes, present your answer as a table.\n"
+                else:
+                    extra_instruction = "If the context is from documentation, answer in plain text, not as a table.\n"
                 prompt_for_llm = f"""Context:
 {combined_context}
 
@@ -572,9 +577,7 @@ User Question: {prompt}
 When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. 
 Answer the user question based *only* on the provided context and the conversation history. 
 If you have information from both database attributes and documentation, synthesize them to provide a comprehensive answer. 
-If the context is a table of attributes, present your answer as a table.
-
-When using documentation context, quote or closely follow the original wording and structure whenever possible. 
+{extra_instruction}When using documentation context, quote or closely follow the original wording and structure whenever possible. 
 Only summarize or paraphrase when necessary for clarity, and do not add information not present in the context.
 """
                 llm_response = get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
