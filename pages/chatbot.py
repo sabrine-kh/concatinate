@@ -12,6 +12,7 @@ from supabase import create_client, Client
 from sentence_transformers import SentenceTransformer
 from groq import Groq
 import logging
+import sys
 
 # --- LangChain imports for agent-based routing ---
 from langchain.tools import Tool
@@ -467,9 +468,9 @@ llm = ChatGroq(
     seed=42
 )
 
-# Configure logging to file
+# Configure logging to stdout
 logging.basicConfig(
-    filename='chatbot.log',
+    stream=sys.stdout,  # <-- Send logs to stdout, visible in Streamlit Cloud logs
     level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s'
 )
