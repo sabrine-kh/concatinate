@@ -121,5 +121,5 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.last_part_number = None
         st.rerun()
-    if st.button("📊 Evaluate Doc Search"):
-        st.switch_page("pages/evaluate_doc_search.py")
+    # Disable the evaluation button on this page
+    st.button("📊 Evaluate Doc Search", disabled=True)
