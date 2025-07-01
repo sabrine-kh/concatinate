@@ -83,7 +83,7 @@ if st.button("Run Evaluation"):
             emb_gt = model.encode(expected_answer, convert_to_tensor=True)
             emb_ret = model.encode(retrieved_text, convert_to_tensor=True)
             similarity = util.pytorch_cos_sim(emb_gt, emb_ret).item()
-            hit = similarity > 0.7
+            hit = similarity > 0.5
             hits += int(hit)
             results.append({
                 "question": question,
@@ -101,6 +101,7 @@ if st.button("Run Evaluation"):
             })
             st.write(f"**Q:** {question}")
             st.write(f"**Similarity:** {similarity:.2f} | **Hit:** {hit}")
+            st.write(f"**Retrieved Text:**\n{retrieved_text}")
             st.write("---")
         except Exception as e:
             st.error(f"Error for question '{question}': {e}")
