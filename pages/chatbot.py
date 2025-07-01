@@ -341,21 +341,23 @@ def _to_dict(maybe_json):
 #  CONTEXT FORMATTING
 # ───────────────────────────────────────────────────────────────────────────
 def format_context(attribute_rows):
-    context_str = ""
-    attr_present = bool(attribute_rows)
-    if attr_present:
-        context_str += "Context from Leoni Attributes Table:\n\n"
-        for i, row in enumerate(attribute_rows):
-            context_str += f"--- Attribute Row {i+1} ---\n"
-            row_str_parts = []
-            for key, value in row.items():
-                if value is not None:
-                    row_str_parts.append(f"  {key}: {json.dumps(value)}")
-            context_str += "\n".join(row_str_parts)
-            context_str += "\n---\n\n"
-    if not attr_present:
+    if not attribute_rows:
         return "No relevant information found in the knowledge base (attributes)."
-    return context_str.strip()
+    # If only one row, show as a vertical table (attribute | value)
+    if len(attribute_rows) == 1:
+        row = attribute_rows[0]
+        table = "| Attribute | Value |\n|---|---|\n"
+        for key, value in row.items():
+            if value is not None:
+                table += f"| {key} | {json.dumps(value)} |\n"
+        return table
+    # If multiple rows, show as a horizontal table
+    headers = list(attribute_rows[0].keys())
+    table = "| " + " | ".join(headers) + " |\n"
+    table += "| " + " | ".join("---" for _ in headers) + " |\n"
+    for row in attribute_rows:
+        table += "| " + " | ".join(json.dumps(row.get(h, "")) for h in headers) + " |\n"
+    return table
 
 # ───────────────────────────────────────────────────────────────────────────
 #  CHAT COMPLETION FOR ANSWERS
@@ -567,7 +569,8 @@ Conversation history:
 {history}
 User Question: {prompt}
 
-When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. Answer the user question based *only* on the provided context and the conversation history. If you have information from both database attributes and documentation, synthesize them to provide a comprehensive answer."""
+When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. Answer the user question based *only* on the provided context and the conversation history. If you have information from both database attributes and documentation, synthesize them to provide a comprehensive answer. If the context is a table of attributes, present your answer as a table.
+"""
                 llm_response = get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
                 st.markdown(llm_response)
                 st.session_state.messages.append({"role": "assistant", "content": llm_response})
