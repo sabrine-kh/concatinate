@@ -11,6 +11,7 @@ import contextlib
 from supabase import create_client, Client
 from sentence_transformers import SentenceTransformer
 from groq import Groq
+import logging
 
 # --- LangChain imports for agent-based routing ---
 from langchain.tools import Tool
@@ -461,6 +462,13 @@ llm = ChatGroq(
     seed=42
 )
 
+# Configure logging to file
+logging.basicConfig(
+    filename='chatbot.log',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s'
+)
+
 # --- LLM-based tool classifier ---
 def llm_choose_tool(question, llm):
     prompt = (
@@ -471,9 +479,9 @@ def llm_choose_tool(question, llm):
         "Answer with only 'SQL' or 'VECTOR'.\n\n"
         f"User question: {question}\nTool:"
     )
-    st.info(f"[LOG] LLM routing prompt: {prompt}")
+    logging.info(f"[LOG] LLM routing prompt: {prompt}")
     response = llm.invoke(prompt) if hasattr(llm, 'invoke') else llm(prompt)
-    st.info(f"[LOG] LLM routing response: {response}")
+    logging.info(f"[LOG] LLM routing response: {response}")
     if hasattr(response, "content"):
         answer_text = response.content
     else:
@@ -505,9 +513,9 @@ def run_chatbot():
             st.markdown(prompt)
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                st.info(f"[LOG] User question: {prompt}")
+                logging.info(f"[LOG] User question: {prompt}")
                 tool_choice = llm_choose_tool(prompt, llm)
-                st.info(f"[LOG] LLM tool choice: {tool_choice}")
+                logging.info(f"[LOG] LLM tool choice: {tool_choice}")
                 relevant_attribute_rows = []
                 relevant_markdown_chunks = []
                 context_was_found = False
@@ -521,16 +529,16 @@ def run_chatbot():
                     ):
                         prompt_for_sql = f"{prompt} (about part number {st.session_state.last_part_number})"
                     generated_sql = generate_sql_from_query(prompt_for_sql, leoni_attributes_schema_for_main_loop)
-                    st.info(f"[LOG] Generated SQL: {generated_sql}")
+                    logging.info(f"[LOG] Generated SQL: {generated_sql}")
                     if generated_sql:
                         relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
-                        st.info(f"[LOG] SQL tool returned rows: {len(relevant_attribute_rows)}")
+                        logging.info(f"[LOG] SQL tool returned rows: {len(relevant_attribute_rows)}")
                         context_was_found = bool(relevant_attribute_rows)
                     relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
-                    st.info(f"[LOG] Vector tool (for context) returned chunks: {len(relevant_markdown_chunks)}")
+                    logging.info(f"[LOG] Vector tool (for context) returned chunks: {len(relevant_markdown_chunks)}")
                 else:
                     relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
-                    st.info(f"[LOG] Vector tool returned chunks: {len(relevant_markdown_chunks)}")
+                    logging.info(f"[LOG] Vector tool returned chunks: {len(relevant_markdown_chunks)}")
                     context_was_found = bool(relevant_markdown_chunks)
                 attribute_context = format_context(relevant_attribute_rows)
                 markdown_context = format_markdown_context(relevant_markdown_chunks)
@@ -541,7 +549,7 @@ def run_chatbot():
                     combined_context += f"**Documentation/Standards Information:**\n{markdown_context}\n\n"
                 if not combined_context:
                     combined_context = "No relevant information found in the knowledge base (attributes or documentation)."
-                st.info(f"[LOG] Final context sent to LLM:\n{combined_context}")
+                logging.info(f"[LOG] Final context sent to LLM:\n{combined_context}")
                 history = ""
                 for message in st.session_state.messages[-10:-1]:
                     role = "User" if message["role"] == "user" else "Assistant"
