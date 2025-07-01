@@ -9,6 +9,9 @@ from supabase import create_client
 os.environ["WANDB_API_KEY"] = st.secrets["WANDB_API_KEY"]
 wandb.login(key=os.environ["WANDB_API_KEY"])
 
+# Initialize wandb BEFORE any wandb.log
+wandb.init(project="leoparts-doc-search-eval")
+
 st.title("Document Search Evaluation with wandb")
 st.write("This page evaluates your document search using the provided ground truth and logs results to wandb.")
 
@@ -67,7 +70,6 @@ ground_truth = [
 ]
 
 if st.button("Run Evaluation"):
-    wandb.init(project="leoparts-doc-search-eval")
     model = SentenceTransformer("all-MiniLM-L6-v2")
     hits = 0
     results = []
