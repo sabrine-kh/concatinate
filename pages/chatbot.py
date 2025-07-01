@@ -528,6 +528,7 @@ def run_chatbot():
                 relevant_markdown_chunks = []
                 context_was_found = False
                 generated_sql = None
+                combined_context = ""
                 if tool_choice == "sql":
                     prompt_for_sql = prompt
                     if (
@@ -542,21 +543,22 @@ def run_chatbot():
                         relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
                         logging.info(f"[LOG] SQL tool returned rows: {len(relevant_attribute_rows)}")
                         context_was_found = bool(relevant_attribute_rows)
-                    relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
-                    logging.info(f"[LOG] Vector tool (for context) returned chunks: {len(relevant_markdown_chunks)}")
-                else:
+                    attribute_context = format_context(relevant_attribute_rows)
+                    if relevant_attribute_rows:
+                        combined_context = f"**Database Attributes Information:**\n{attribute_context}\n\n"
+                    else:
+                        combined_context = "No relevant information found in the database."
+                elif tool_choice == "vector":
                     relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
                     logging.info(f"[LOG] Vector tool returned chunks: {len(relevant_markdown_chunks)}")
                     context_was_found = bool(relevant_markdown_chunks)
-                attribute_context = format_context(relevant_attribute_rows)
-                markdown_context = format_markdown_context(relevant_markdown_chunks)
-                combined_context = ""
-                if relevant_attribute_rows:
-                    combined_context += f"**Database Attributes Information:**\n{attribute_context}\n\n"
-                if relevant_markdown_chunks:
-                    combined_context += f"**Documentation/Standards Information:**\n{markdown_context}\n\n"
-                if not combined_context:
-                    combined_context = "No relevant information found in the knowledge base (attributes or documentation)."
+                    markdown_context = format_markdown_context(relevant_markdown_chunks)
+                    if relevant_markdown_chunks:
+                        combined_context = f"**Documentation/Standards Information:**\n{markdown_context}\n\n"
+                    else:
+                        combined_context = "No relevant information found in the documentation."
+                else:
+                    combined_context = "No relevant information found."
                 logging.info(f"[LOG] Final context sent to LLM:\n{combined_context}")
                 history = ""
                 for message in st.session_state.messages[-10:-1]:
@@ -571,7 +573,6 @@ User Question: {prompt}
 
 When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. 
 Answer the user question based *only* on the provided context and the conversation history. 
-If you have information from both database attributes and documentation, synthesize them to provide a comprehensive answer. 
 If the context is a table of attributes, present your answer as a table.
 
 When using documentation context, quote or closely follow the original wording and structure whenever possible. 
