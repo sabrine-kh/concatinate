@@ -5,12 +5,12 @@ from pages.chatbot import find_relevant_markdown_chunks
 from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 
+# Initialize wandb FIRST, before any other code
+wandb.init(project="leoparts-doc-search-eval")
+
 # Authenticate wandb using Streamlit secrets
 os.environ["WANDB_API_KEY"] = st.secrets["WANDB_API_KEY"]
 wandb.login(key=os.environ["WANDB_API_KEY"])
-
-# Initialize wandb BEFORE any wandb.log
-wandb.init(project="leoparts-doc-search-eval")
 
 st.title("Document Search Evaluation with wandb")
 st.write("This page evaluates your document search using the provided ground truth and logs results to wandb.")
