@@ -52,9 +52,8 @@ ground_truth = [
 ]
 
 if st.button("Run Evaluation"):
-    # Initialize wandb and login at the start of evaluation
+    # Initialize wandb at the start of evaluation
     try:
-        wandb.login(key=os.environ["WANDB_API_KEY"])
         wandb.init(project="leoparts-doc-search-eval")
         wandb_initialized = True
     except Exception as e:
