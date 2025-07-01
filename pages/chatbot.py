@@ -61,7 +61,7 @@ with st.sidebar:
     if st.button("🆕 Nouvelle conversation"):
         st.session_state.messages = []
         st.session_state.last_part_number = None
-        st.experimental_rerun()
+        st.rerun()
 
 # Add navigation button at the top
 if st.sidebar.button("← Back to Main App", use_container_width=True):
