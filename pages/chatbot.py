@@ -445,7 +445,7 @@ def extract_part_number(text):
     return None
 
 def run_chatbot():
-    st.title("🤖 Chatbot")
+    st.title("🤖 Welcome to Leoni Chatbot")
     st.markdown("Ask questions about the extracted data.")
     
     # Initialize chat history
