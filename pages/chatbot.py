@@ -494,13 +494,22 @@ vector_tool = Tool(
 )
 
 # --- Initialize LangChain agent for tool selection ---
+# Custom prefix to force tool use only
+custom_prefix = (
+    "You are a helpful assistant for LEOparts. "
+    "You have access to the following tools: SQL Search and Vector Search. "
+    "You MUST use one of these tools to answer every question. "
+    "NEVER answer from your own knowledge. "
+    "If the tools return nothing, say 'No relevant information found in the knowledge base.'"
+)
 tools = [sql_tool, vector_tool]
 agent = initialize_agent(
     tools,
     llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=False,
-    handle_parsing_errors=True  # Added to handle LLM output parsing errors gracefully
+    handle_parsing_errors=True,  # Added to handle LLM output parsing errors gracefully
+    agent_kwargs={'prefix': custom_prefix}  # Enforce tool use only
 )
 
 def run_chatbot():
@@ -545,9 +554,9 @@ def run_chatbot():
                 st.info(f"[LOG] Agent raw result: {agent_result}")
                 # agent_result is a dict with keys 'type' and 'data', or a string (direct answer)
                 if isinstance(agent_result, str):
-                    st.markdown(agent_result)
-                    st.session_state.messages.append({"role": "assistant", "content": agent_result})
-                    st.info("[LOG] Agent returned a string (final answer shown directly)")
+                    st.markdown('No relevant information found in the knowledge base.')
+                    st.session_state.messages.append({"role": "assistant", "content": 'No relevant information found in the knowledge base.'})
+                    st.info("[LOG] Agent returned a string (tool use was enforced, so showing fallback message)")
                     return  # Stop further processing if direct answer
                 elif isinstance(agent_result, dict):
                     tool_type = agent_result.get("type")
