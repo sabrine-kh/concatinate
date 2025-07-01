@@ -450,7 +450,6 @@ def extract_part_number(text):
     return None
 
 # --- Initialize LangChain LLM (Qwen via Groq) ---
-# (If you already have a function for this, use it; otherwise, inline here)
 llm = ChatGroq(
     temperature=0.0,
     top_p=1.0,
@@ -462,126 +461,73 @@ llm = ChatGroq(
     seed=42
 )
 
-# --- Wrap SQL and vector search as LangChain tools ---
-def sql_tool_func(question):
-    prompt_for_sql = question
-    if (
-        ("part number" in question.lower() or "state" in question.lower() or "approved" in question.lower() or "sourcing status" in question.lower())
-        and not extract_part_number(question)
-        and st.session_state.last_part_number
-    ):
-        prompt_for_sql = f"{question} (about part number {st.session_state.last_part_number})"
-    generated_sql = generate_sql_from_query(prompt_for_sql, leoni_attributes_schema_for_main_loop)
-    if generated_sql:
-        relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
-        return {"type": "sql", "data": relevant_attribute_rows}
-    return {"type": "sql", "data": []}
-
-def vector_tool_func(question):
-    chunks = find_relevant_markdown_chunks(question, limit=3)
-    return {"type": "vector", "data": chunks}
-
-sql_tool = Tool(
-    name="SQL Search",
-    func=sql_tool_func,
-    description="Use for questions about part numbers, attributes, or database lookups (e.g., 'What is the status of part number P00012345?')."
-)
-
-vector_tool = Tool(
-    name="Vector Search",
-    func=vector_tool_func,
-    description="Use for definitions, explanations, or general knowledge (e.g., 'What is TPA?')."
-)
-
-# --- Initialize LangChain agent for tool selection ---
-# Custom prefix to force tool use only
-custom_prefix = (
-    "You are a helpful assistant for LEOparts. "
-    "You have access to the following tools: SQL Search and Vector Search. "
-    "You MUST use one of these tools to answer every question. "
-    "NEVER answer from your own knowledge. "
-    "If the tools return nothing, say 'No relevant information found in the knowledge base.'"
-)
-tools = [sql_tool, vector_tool]
-agent = initialize_agent(
-    tools,
-    llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=False,
-    handle_parsing_errors=True,  # Added to handle LLM output parsing errors gracefully
-    agent_kwargs={'prefix': custom_prefix}  # Enforce tool use only
-)
+# --- LLM-based tool classifier ---
+def llm_choose_tool(question, llm):
+    prompt = (
+        "You are a router for a chatbot. "
+        "Given the following user question, decide which tool should be used to answer it. "
+        "If the question is about part numbers, attributes, or database lookups, answer 'SQL'. "
+        "If the question is about definitions, explanations, or general knowledge, answer 'VECTOR'. "
+        "Answer with only 'SQL' or 'VECTOR'.\n\n"
+        f"User question: {question}\nTool:"
+    )
+    st.info(f"[LOG] LLM routing prompt: {prompt}")
+    response = llm.invoke(prompt) if hasattr(llm, 'invoke') else llm(prompt)
+    st.info(f"[LOG] LLM routing response: {response}")
+    answer = response.strip().upper()
+    if "SQL" in answer:
+        return "sql"
+    elif "VECTOR" in answer:
+        return "vector"
+    else:
+        return "vector"  # default fallback
 
 def run_chatbot():
     st.title("🤖 Welcome to Leoni Chatbot")
     st.markdown("Ask questions about the extracted data.")
-    
-    # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
-    # Initialiser la mémoire du dernier numéro de pièce
     if "last_part_number" not in st.session_state:
         st.session_state.last_part_number = None
-
-    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-
-    # Chat input
     if prompt := st.chat_input("What would you like to know?"):
-        # Détecter un numéro de pièce dans la question
         part_number = extract_part_number(prompt)
         if part_number:
             st.session_state.last_part_number = part_number
-
-        # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
-
-        # Process the query
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
+                st.info(f"[LOG] User question: {prompt}")
+                tool_choice = llm_choose_tool(prompt, llm)
+                st.info(f"[LOG] LLM tool choice: {tool_choice}")
                 relevant_attribute_rows = []
                 relevant_markdown_chunks = []
                 context_was_found = False
                 generated_sql = None
-
-                # --- NEW: Use agent to select tool and get result ---
-                st.info(f"[LOG] User question: {prompt}")
-                agent_result = agent.run(prompt)
-                st.info(f"[LOG] Agent raw result: {agent_result}")
-                # agent_result is a dict with keys 'type' and 'data', or a string (direct answer)
-                if isinstance(agent_result, str):
-                    st.markdown('No relevant information found in the knowledge base.')
-                    st.session_state.messages.append({"role": "assistant", "content": 'No relevant information found in the knowledge base.'})
-                    st.info("[LOG] Agent returned a string (tool use was enforced, so showing fallback message)")
-                    return  # Stop further processing if direct answer
-                elif isinstance(agent_result, dict):
-                    tool_type = agent_result.get("type")
-                    st.info(f"[LOG] Agent selected tool: {tool_type}")
-                    if tool_type == "sql":
-                        relevant_attribute_rows = agent_result.get("data", [])
+                if tool_choice == "sql":
+                    prompt_for_sql = prompt
+                    if (
+                        ("part number" in prompt.lower() or "state" in prompt.lower() or "approved" in prompt.lower() or "sourcing status" in prompt.lower())
+                        and not extract_part_number(prompt)
+                        and st.session_state.last_part_number
+                    ):
+                        prompt_for_sql = f"{prompt} (about part number {st.session_state.last_part_number})"
+                    generated_sql = generate_sql_from_query(prompt_for_sql, leoni_attributes_schema_for_main_loop)
+                    st.info(f"[LOG] Generated SQL: {generated_sql}")
+                    if generated_sql:
+                        relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
                         st.info(f"[LOG] SQL tool returned rows: {len(relevant_attribute_rows)}")
-                        # Optionally, also run vector search for context
-                        relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
-                        st.info(f"[LOG] Vector tool (for context) returned chunks: {len(relevant_markdown_chunks)}")
-                    elif tool_type == "vector":
-                        relevant_markdown_chunks = agent_result.get("data", [])
-                        relevant_attribute_rows = []
-                        st.info(f"[LOG] Vector tool returned chunks: {len(relevant_markdown_chunks)}")
-                    # Set context_was_found if any data found
-                    if relevant_attribute_rows or relevant_markdown_chunks:
-                        context_was_found = True
+                        context_was_found = bool(relevant_attribute_rows)
+                    relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
+                    st.info(f"[LOG] Vector tool (for context) returned chunks: {len(relevant_markdown_chunks)}")
                 else:
-                    # Fallback: treat as no context
-                    relevant_attribute_rows = []
-                    relevant_markdown_chunks = []
-                    combined_context = "No relevant information found in the knowledge base (attributes or documentation)."
-                    st.info(f"[LOG] Agent result fallback: no context")
-
-                # 4. Prepare combined context
+                    relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
+                    st.info(f"[LOG] Vector tool returned chunks: {len(relevant_markdown_chunks)}")
+                    context_was_found = bool(relevant_markdown_chunks)
                 attribute_context = format_context(relevant_attribute_rows)
                 markdown_context = format_markdown_context(relevant_markdown_chunks)
                 combined_context = ""
@@ -592,14 +538,10 @@ def run_chatbot():
                 if not combined_context:
                     combined_context = "No relevant information found in the knowledge base (attributes or documentation)."
                 st.info(f"[LOG] Final context sent to LLM:\n{combined_context}")
-
-                # 4.1. Préparer l'historique de la conversation (5 derniers échanges)
                 history = ""
                 for message in st.session_state.messages[-10:-1]:
                     role = "User" if message["role"] == "user" else "Assistant"
                     history += f"{role}: {message['content']}\n"
-
-                # 5. Generate Response
                 prompt_for_llm = f"""Context:
 {combined_context}
 
