@@ -423,18 +423,23 @@ def find_relevant_markdown_chunks(user_query: str, limit: int = 5):
         return []
 
 def format_markdown_context(markdown_chunks):
-    """Formats markdown chunks into a readable context string."""
+    """Formats markdown chunks into a readable context string, filtering out navigation links."""
     if not markdown_chunks:
         return "No relevant markdown content found."
-    
     context_parts = []
     for i, chunk in enumerate(markdown_chunks):
         content = chunk.get('content', '')
         source = chunk.get('source', 'Unknown')
         page = chunk.get('page', 'N/A')
-        
-        context_parts.append(f"--- Markdown Chunk {i+1} (Source: {source}, Page: {page}) ---\n{content}")
-    
+        # Remove navigation links like 'back to Table of Content' (case-insensitive)
+        filtered_lines = [
+            line for line in content.splitlines()
+            if 'back to table of content' not in line.lower()
+            and 'back to contents' not in line.lower()
+            and 'table of content' not in line.lower()
+        ]
+        filtered_content = '\n'.join(filtered_lines)
+        context_parts.append(f"--- Markdown Chunk {i+1} (Source: {source}, Page: {page}) ---\n{filtered_content}")
     return "\n\n".join(context_parts)
 
 # ───────────────────────────────────────────────────────────────────────────
