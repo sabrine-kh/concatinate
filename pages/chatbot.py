@@ -550,12 +550,12 @@ def run_chatbot():
                     context_was_found = bool(relevant_markdown_chunks)
                 attribute_context = format_context(relevant_attribute_rows)
                 markdown_context = format_markdown_context(relevant_markdown_chunks)
-                combined_context = ""
-                if relevant_attribute_rows:
-                    combined_context += f"**Database Attributes Information:**\n{attribute_context}\n\n"
+                # Prefer documentation context if both are found
                 if relevant_markdown_chunks:
-                    combined_context += f"**Documentation/Standards Information:**\n{markdown_context}\n\n"
-                if not combined_context:
+                    combined_context = f"**Documentation/Standards Information:**\n{markdown_context}\n\n"
+                elif relevant_attribute_rows:
+                    combined_context = f"**Database Attributes Information:**\n{attribute_context}\n\n"
+                else:
                     combined_context = "No relevant information found in the knowledge base (attributes or documentation)."
                 logging.info(f"[LOG] Final context sent to LLM:\n{combined_context}")
                 history = ""
