@@ -499,7 +499,8 @@ agent = initialize_agent(
     tools,
     llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=False
+    verbose=False,
+    handle_parsing_errors=True  # Added to handle LLM output parsing errors gracefully
 )
 
 def run_chatbot():
