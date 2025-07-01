@@ -474,7 +474,11 @@ def llm_choose_tool(question, llm):
     st.info(f"[LOG] LLM routing prompt: {prompt}")
     response = llm.invoke(prompt) if hasattr(llm, 'invoke') else llm(prompt)
     st.info(f"[LOG] LLM routing response: {response}")
-    answer = response.strip().upper()
+    if hasattr(response, "content"):
+        answer_text = response.content
+    else:
+        answer_text = str(response)
+    answer = answer_text.strip().upper()
     if "SQL" in answer:
         return "sql"
     elif "VECTOR" in answer:
