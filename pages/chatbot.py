@@ -470,7 +470,7 @@ llm = ChatGroq(
 
 # Configure logging to stdout
 logging.basicConfig(
-    stream=sys.stdout,  # <-- Send logs to stdout, visible in Streamlit Cloud logs
+    stream=sys.stdout,  # <-- This sends logs to the console, visible in Streamlit Cloud logs
     level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s'
 )
