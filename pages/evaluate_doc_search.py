@@ -263,7 +263,7 @@ if st.button("Run Evaluation"):
                 chunk_text = chunk.get("content", "")
                 emb_chunk = model.encode(chunk_text, convert_to_tensor=True)
                 sim_chunk = util.pytorch_cos_sim(emb_gt, emb_chunk).item()
-                if sim_chunk > 0.5:
+                if sim_chunk > 0.8:
                     relevant_chunks += 1
             context_precision = relevant_chunks / len(chunks) if chunks else 0
             context_precisions.append(context_precision)
@@ -274,7 +274,7 @@ if st.button("Run Evaluation"):
                 chunk_text = chunk.get("content", "")
                 emb_chunk = model.encode(chunk_text, convert_to_tensor=True)
                 sim_chunk = util.pytorch_cos_sim(emb_gt, emb_chunk).item()
-                if sim_chunk > 0.5:
+                if sim_chunk > 0.8:
                     total_relevant_in_db += 1
             context_recall = (relevant_chunks / total_relevant_in_db) if total_relevant_in_db > 0 else 0
             context_recalls.append(context_recall)
