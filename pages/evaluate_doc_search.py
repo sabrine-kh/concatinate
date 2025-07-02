@@ -1,7 +1,17 @@
 import os
 import streamlit as st
 import wandb
-from pages.chatbot import find_relevant_markdown_chunks
+from pages.chatbot import (
+    find_relevant_markdown_chunks,
+    format_markdown_context,
+    format_context,
+    generate_sql_from_query,
+    find_relevant_attributes_with_sql,
+    llm_choose_tool,
+    get_groq_chat_response,
+    leoni_attributes_schema_for_main_loop,
+    llm
+)
 from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 import pandas as pd
@@ -48,11 +58,30 @@ ground_truth = [
 
 # Helper: get chatbot answer (wraps existing logic, does not change it)
 def get_chatbot_answer(question):
-    # This function should call your chatbot's answer logic as is.
-    # For demonstration, we'll use the vector search as a placeholder.
-    # Replace this with your actual chatbot answer logic if available.
-    chunks = find_relevant_markdown_chunks(question, limit=3)
-    return "\n".join(chunk.get("content", "") for chunk in chunks)
+    # Use the same logic as the chatbot UI
+    tool_choice = llm_choose_tool(question, llm)
+    relevant_attribute_rows = []
+    relevant_markdown_chunks = []
+    context_was_found = False
+    if tool_choice == "sql":
+        generated_sql = generate_sql_from_query(question, leoni_attributes_schema_for_main_loop)
+        if generated_sql:
+            relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
+            context_was_found = bool(relevant_attribute_rows)
+    relevant_markdown_chunks = find_relevant_markdown_chunks(question, limit=3)
+    if relevant_markdown_chunks:
+        context_was_found = True
+    attribute_context = format_context(relevant_attribute_rows)
+    markdown_context = format_markdown_context(relevant_markdown_chunks)
+    combined_context = ""
+    if relevant_attribute_rows:
+        combined_context += f"**Database Attributes Information:**\n{attribute_context}\n\n"
+    if relevant_markdown_chunks:
+        combined_context += f"**Documentation/Standards Information:**\n{markdown_context}\n\n"
+    if not combined_context:
+        combined_context = "No relevant information found in the knowledge base (attributes or documentation)."
+    prompt_for_llm = f"Context:\n{combined_context}\n\nUser Question: {question}\n"
+    return get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
 
 # Authenticate wandb using Streamlit secrets
 os.environ["WANDB_API_KEY"] = st.secrets["WANDB_API_KEY"]
