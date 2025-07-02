@@ -15,6 +15,7 @@ from pages.chatbot import (
 from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 import pandas as pd
+import re
 
 # --- Ground truth ---
 ground_truth = [
@@ -107,6 +108,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     context_precisions = []
     context_recalls = []
     context_f1s = []
+    SIMILARITY_THRESHOLD = 0.7  # Use a variable for easy adjustment
     for idx, item in enumerate(ground_truth):
         question = item["question"]
         expected_answer = item["answer"]
@@ -115,11 +117,21 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             emb_gt = model.encode(expected_answer, convert_to_tensor=True)
             emb_cb = model.encode(chatbot_answer, convert_to_tensor=True)
             similarity = util.pytorch_cos_sim(emb_gt, emb_cb).item()
-            hit = similarity > 0.5
+            hit = similarity > SIMILARITY_THRESHOLD
             hits += int(hit)
-            # Context Precision, Recall, F1 (treat chatbot answer as one chunk)
-            context_precision = 1 if similarity > 0.7 else 0
+            # Standard Context Precision: compare chatbot answer to ground truth in chunks
+            # For chatbot, treat the answer as a single chunk, but for standard, you would use multiple chunks
+            # Here, let's simulate by splitting the chatbot answer into sentences (as pseudo-chunks)
+            answer_chunks = [s.strip() for s in re.split(r'[.!?]', chatbot_answer) if s.strip()]
+            relevant_chunks = 0
+            for chunk in answer_chunks:
+                emb_chunk = model.encode(chunk, convert_to_tensor=True)
+                sim_chunk = util.pytorch_cos_sim(emb_gt, emb_chunk).item()
+                if sim_chunk > SIMILARITY_THRESHOLD:
+                    relevant_chunks += 1
+            context_precision = relevant_chunks / len(answer_chunks) if answer_chunks else 0
             context_precisions.append(context_precision)
+            # Context Recall and F1 remain as before (since we have only one answer per question)
             context_recall = context_precision
             context_recalls.append(context_recall)
             context_f1 = context_precision
@@ -151,7 +163,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 st.markdown(f"**Chatbot Answer:** {chatbot_answer[:500]}{'...' if len(chatbot_answer) > 500 else ''}")
                 st.markdown(f"**Similarity Score:** {similarity:.3f}")
                 st.markdown(f"**Hit:** {'✅ Yes' if hit else '❌ No'}")
-                st.markdown(f"**Context Precision:** {context_precision:.3f}")
+                st.markdown(f"**Standard Context Precision:** {context_precision:.3f}")
                 st.markdown(f"**Context Recall:** {context_recall:.3f}")
                 st.markdown(f"**Context F1:** {context_f1:.3f}")
         except Exception as e:
@@ -173,7 +185,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     with col1:
         st.metric("Accuracy", f"{accuracy:.1%}")
     with col2:
-        st.metric("Avg Context Precision", f"{avg_context_precision:.3f}")
+        st.metric("Avg Standard Context Precision", f"{avg_context_precision:.3f}")
     with col3:
         st.metric("Avg Context Recall", f"{avg_context_recall:.3f}")
     with col4:
