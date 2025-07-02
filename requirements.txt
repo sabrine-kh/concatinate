@@ -31,3 +31,7 @@ groq>=0.4.0
 # Async handling
 nest_asyncio>=1.5.8
 wandb
+
+rouge-score
+nltk
+
