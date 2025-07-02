@@ -127,7 +127,7 @@ GROQ_MODEL_FOR_ANSWER = "qwen-qwq-32b"              ### <-- CHANGED
 # st.write(f"Using Groq Model for Answer: {GROQ_MODEL_FOR_ANSWER}")
 
 # --- Search Parameters ---
-VECTOR_SIMILARITY_THRESHOLD = 0.5
+VECTOR_SIMILARITY_THRESHOLD = 0.4
 VECTOR_MATCH_COUNT = 3
 
 # --- Initialize Clients ---
