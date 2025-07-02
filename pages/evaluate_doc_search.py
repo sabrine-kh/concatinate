@@ -4,6 +4,15 @@ import wandb
 from pages.chatbot import find_relevant_markdown_chunks
 from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
+import pandas as pd
+
+# Helper: get chatbot answer (wraps existing logic, does not change it)
+def get_chatbot_answer(question):
+    # This function should call your chatbot's answer logic as is.
+    # For demonstration, we'll use the vector search as a placeholder.
+    # Replace this with your actual chatbot answer logic if available.
+    chunks = find_relevant_markdown_chunks(question, limit=3)
+    return "\n".join(chunk.get("content", "") for chunk in chunks)
 
 # Authenticate wandb using Streamlit secrets
 os.environ["WANDB_API_KEY"] = st.secrets["WANDB_API_KEY"]
@@ -198,7 +207,6 @@ if st.button("Run Evaluation"):
             "Status": "PASS" if result["hit"] else "FAIL"
         })
     
-    import pandas as pd
     df = pd.DataFrame(results_data)
     st.dataframe(df, use_container_width=True)
     
@@ -257,6 +265,63 @@ if st.button("Run Evaluation"):
     # Show wandb link if available
     if wandb_initialized:
         st.info("📊 **Results logged to wandb** - Check your dashboard for detailed analytics and charts.")
+
+# New evaluation: Chatbot output vs Ground Truth
+if st.button("Run Chatbot vs Ground Truth Evaluation"):
+    try:
+        wandb.init(project="chatbot-vs-gt-eval")
+        wandb_initialized = True
+    except Exception as e:
+        st.error(f"Failed to initialize wandb: {e}")
+        wandb_initialized = False
+    
+    st.subheader("🤖 Chatbot Output vs Ground Truth Evaluation")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    hits = 0
+    results = []
+    progress = st.progress(0)
+    for idx, item in enumerate(ground_truth):
+        question = item["question"]
+        expected_answer = item["answer"]
+        try:
+            chatbot_answer = get_chatbot_answer(question)
+            emb_gt = model.encode(expected_answer, convert_to_tensor=True)
+            emb_cb = model.encode(chatbot_answer, convert_to_tensor=True)
+            similarity = util.pytorch_cos_sim(emb_gt, emb_cb).item()
+            hit = similarity > 0.5
+            hits += int(hit)
+            results.append({
+                "question": question,
+                "expected_answer": expected_answer,
+                "chatbot_answer": chatbot_answer,
+                "similarity": similarity,
+                "hit": hit
+            })
+            if wandb_initialized:
+                wandb.log({
+                    "question": question,
+                    "expected_answer": expected_answer,
+                    "chatbot_answer": chatbot_answer,
+                    "similarity": similarity,
+                    "hit": hit
+                })
+            with st.expander(f"{'✅' if hit else '❌'} Q{idx+1}: {question[:50]}...", expanded=False):
+                st.markdown(f"**Question:** {question}")
+                st.markdown(f"**Expected Answer:** {expected_answer}")
+                st.markdown(f"**Chatbot Answer:** {chatbot_answer[:500]}{'...' if len(chatbot_answer) > 500 else ''}")
+                st.markdown(f"**Similarity Score:** {similarity:.3f}")
+                st.markdown(f"**Hit:** {'✅ Yes' if hit else '❌ No'}")
+        except Exception as e:
+            st.error(f"Error for question '{question}': {e}")
+            if wandb_initialized:
+                wandb.log({"error": f"{question}: {e}"})
+        progress.progress((idx + 1) / len(ground_truth))
+    accuracy = hits / len(ground_truth)
+    st.success(f"🤖 **Chatbot Evaluation Complete!** Final Accuracy: {accuracy:.1%} ({hits}/{len(ground_truth)} questions answered correctly)")
+    if wandb_initialized:
+        wandb.log({"accuracy": accuracy, "total_questions": len(ground_truth), "hits": hits})
+        wandb.finish()
+    st.info("📊 **Results logged to wandb** - Check your dashboard for detailed analytics and charts.")
 
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
