@@ -191,8 +191,10 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     avg_context_precision = sum(context_precisions) / len(context_precisions) if context_precisions else 0.0
     avg_context_recall = sum(context_recalls) / len(context_recalls) if context_recalls else 0.0
     avg_context_f1 = sum(context_f1s) / len(context_f1s) if context_f1s else 0.0
+    similarities = [r["similarity"] for r in results]
+    avg_answer_correctness = sum(similarities) / len(similarities) if similarities else 0.0
     st.success(f"🤖 **Chatbot Evaluation Complete!** Final Accuracy: {accuracy:.1%} ({hits}/{len(ground_truth)} questions answered correctly)")
-    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
+    col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
     with col1:
         st.metric("Accuracy", f"{accuracy:.1%}")
     with col2:
@@ -206,8 +208,10 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     with col6:
         st.metric("Avg Context F1", f"{avg_context_f1:.3f}")
     with col7:
-        st.metric("Total Questions", f"{len(ground_truth)}")
+        st.metric("Avg Answer Correctness Score", f"{avg_answer_correctness:.3f}")
     with col8:
+        st.metric("Total Questions", f"{len(ground_truth)}")
+    with col9:
         st.metric("Hits", f"{hits}")
     if wandb_initialized:
         wandb.log({
@@ -217,6 +221,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             "avg_context_precision": avg_context_precision,
             "avg_context_recall": avg_context_recall,
             "avg_context_f1": avg_context_f1,
+            "avg_answer_correctness": avg_answer_correctness,
             "total_questions": len(ground_truth),
             "hits": hits
         })
@@ -400,6 +405,8 @@ if st.button("Run Evaluation"):
     avg_context_precision = sum(context_precisions) / len(context_precisions) if context_precisions else 0.0
     avg_context_recall = sum(context_recalls) / len(context_recalls) if context_recalls else 0.0
     avg_context_f1 = sum(context_f1s) / len(context_f1s) if context_f1s else 0.0
+    similarities = [r["similarity"] for r in results]
+    avg_answer_correctness = sum(similarities) / len(similarities) if similarities else 0.0
     
     # Create metrics display
     col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
@@ -503,6 +510,7 @@ if st.button("Run Evaluation"):
             "avg_context_precision": avg_context_precision,
             "avg_context_recall": avg_context_recall,
             "avg_context_f1": avg_context_f1,
+            "avg_answer_correctness": avg_answer_correctness,
             "total_questions": total_questions,
             "hits": hits
         })
