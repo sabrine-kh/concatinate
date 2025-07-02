@@ -17,8 +17,8 @@ ground_truth = [
     "answer": "- Use the value specified on the supplier drawing.\n- If only max and min are given, enter their average (e.g. (3.75 + 4.25)/2 = 4.00 mm).\n- If only max or min is given, use that value.\n- If no supplier data exists, calculate approximately: ≤ 1 mm² → S = X + 1 mm; 1 mm² < X ≤ 16 mm² → S = X + 2 mm; > 16 mm² → S = X + 3 mm.\n- If the wire size spans a boundary (e.g. 0.5–1.5 mm²), choose the average."
   },
   {
-    "question": "What is the Type Of Inductor?",
-    "answer": "Chip inductor: conçu pour montage SMD sur PCB; Coil: inducteur en bobine filaire; One core double choke: un noyau, deux bobines indépendantes; RF inductor: enroulements espacés pour hautes fréquences; Ring choke: (non défini dans le doc, placeholder); Filter, Ferrit, CAN-choke: listés sous RF inductors sans définition détaillée."
+  "question": "What is the Type Of Inductor?",
+  "answer": "Chip inductor: designed for SMD mounting on a PCB\nCoil: wire-wound inductor\nOne core double choke: single core with two independent wire coils\nRF inductor: spaced windings for high-frequency applications\nRing choke: (not defined in the doc, placeholder)\nFilter, Ferrit, CAN-choke: listed under RF inductors without detailed definitions"
   },
   {
     "question": "The grease consists of which material?",
