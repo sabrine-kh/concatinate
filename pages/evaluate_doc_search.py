@@ -15,6 +15,8 @@ from pages.chatbot import (
 from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 import pandas as pd
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+from rouge_score import rouge_scorer
 
 # --- Ground truth ---
 ground_truth = [
@@ -179,6 +181,17 @@ if st.button("Run Evaluation"):
     results = []
     progress = st.progress(0)
     
+    # Context Precision setup
+    TOP_K = 3
+    context_precisions = []
+    context_recalls = []
+    context_f1s = []
+    # BLEU and ROUGE-L setup
+    bleu_scores = []
+    rouge_l_scores = []
+    scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
+    smooth = SmoothingFunction().method1
+    
     # Create columns for better layout
     col1, col2 = st.columns([2, 1])
     
@@ -193,19 +206,59 @@ if st.button("Run Evaluation"):
         question = item["question"]
         expected_answer = item["answer"]
         try:
-            chunks = find_relevant_markdown_chunks(question, limit=3)
+            chunks = find_relevant_markdown_chunks(question, limit=TOP_K)
             retrieved_text = "\n".join(chunk.get("content", "") for chunk in chunks)
             emb_gt = model.encode(expected_answer, convert_to_tensor=True)
             emb_ret = model.encode(retrieved_text, convert_to_tensor=True)
             similarity = util.pytorch_cos_sim(emb_gt, emb_ret).item()
             hit = similarity > 0.5
             hits += int(hit)
+            # Context Precision: fraction of relevant chunks
+            relevant_chunks = 0
+            for chunk in chunks:
+                chunk_text = chunk.get("content", "")
+                emb_chunk = model.encode(chunk_text, convert_to_tensor=True)
+                sim_chunk = util.pytorch_cos_sim(emb_gt, emb_chunk).item()
+                if sim_chunk > 0.5:
+                    relevant_chunks += 1
+            context_precision = relevant_chunks / len(chunks) if chunks else 0
+            context_precisions.append(context_precision)
+            # Context Recall: fraction of all relevant chunks in the database that were retrieved
+            all_chunks = find_relevant_markdown_chunks(question, limit=1000)
+            total_relevant_in_db = 0
+            for chunk in all_chunks:
+                chunk_text = chunk.get("content", "")
+                emb_chunk = model.encode(chunk_text, convert_to_tensor=True)
+                sim_chunk = util.pytorch_cos_sim(emb_gt, emb_chunk).item()
+                if sim_chunk > 0.5:
+                    total_relevant_in_db += 1
+            context_recall = (relevant_chunks / total_relevant_in_db) if total_relevant_in_db > 0 else 0
+            context_recalls.append(context_recall)
+            # Context F1
+            context_f1 = (2 * context_precision * context_recall / (context_precision + context_recall)) if (context_precision + context_recall) > 0 else 0
+            context_f1s.append(context_f1)
+            # BLEU
+            bleu = sentence_bleu(
+                [expected_answer.split()],
+                retrieved_text.split(),
+                smoothing_function=smooth
+            )
+            bleu_scores.append(bleu)
+            # ROUGE-L
+            rouge = scorer.score(expected_answer, retrieved_text)
+            rouge_l = rouge['rougeL'].fmeasure
+            rouge_l_scores.append(rouge_l)
             results.append({
                 "question": question,
                 "expected_answer": expected_answer,
                 "retrieved_text": retrieved_text,
                 "similarity": similarity,
-                "hit": hit
+                "hit": hit,
+                "context_precision": context_precision,
+                "context_recall": context_recall,
+                "context_f1": context_f1,
+                "bleu": bleu,
+                "rouge_l": rouge_l
             })
             if wandb_initialized:
                 wandb.log({
@@ -213,7 +266,12 @@ if st.button("Run Evaluation"):
                     "expected_answer": expected_answer,
                     "retrieved_text": retrieved_text,
                     "similarity": similarity,
-                    "hit": hit
+                    "hit": hit,
+                    "context_precision": context_precision,
+                    "context_recall": context_recall,
+                    "context_f1": context_f1,
+                    "bleu": bleu,
+                    "rouge_l": rouge_l
                 })
             
             # Display results with better formatting
@@ -226,16 +284,24 @@ if st.button("Run Evaluation"):
                     st.markdown(f"**Expected Answer:** {expected_answer}")
                     st.markdown(f"**Similarity Score:** :{similarity_color}[{similarity:.3f}]")
                     st.markdown(f"**Hit:** {'✅ Yes' if hit else '❌ No'}")
+                    st.markdown(f"**Context Precision:** {context_precision:.3f}")
+                    st.markdown(f"**Context Recall:** {context_recall:.3f}")
+                    st.markdown(f"**Context F1:** {context_f1:.3f}")
+                    st.markdown(f"**BLEU:** {bleu:.3f}")
+                    st.markdown(f"**ROUGE-L:** {rouge_l:.3f}")
                     st.markdown("**Retrieved Content:**")
                     st.text(retrieved_text[:500] + "..." if len(retrieved_text) > 500 else retrieved_text)
             
             # Update live metrics
             with col2:
                 current_accuracy = hits / (idx + 1)
+                current_context_precision = sum(context_precisions) / len(context_precisions)
+                current_context_recall = sum(context_recalls) / len(context_recalls)
+                current_context_f1 = sum(context_f1s) / len(context_f1s)
                 with metric_col1:
                     st.metric("Accuracy", f"{current_accuracy:.1%}")
                 with metric_col2:
-                    st.metric("Hits", f"{hits}/{idx+1}")
+                    st.metric("Context F1", f"{current_context_f1:.3f}")
             
         except Exception as e:
             st.error(f"Error for question '{question}': {e}")
@@ -252,9 +318,16 @@ if st.button("Run Evaluation"):
     precision = hits / total_questions  # In this case, precision = accuracy since we're not using top-K
     recall = hits / total_questions     # Same as precision for this evaluation
     f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    similarities = [r["similarity"] for r in results]
+    avg_similarity = sum(similarities) / len(similarities) if similarities else 0.0
+    avg_bleu = sum(bleu_scores) / len(bleu_scores) if bleu_scores else 0.0
+    avg_rouge_l = sum(rouge_l_scores) / len(rouge_l_scores) if rouge_l_scores else 0.0
+    avg_context_precision = sum(context_precisions) / len(context_precisions) if context_precisions else 0.0
+    avg_context_recall = sum(context_recalls) / len(context_recalls) if context_recalls else 0.0
+    avg_context_f1 = sum(context_f1s) / len(context_f1s) if context_f1s else 0.0
     
     # Create metrics display
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
     with col1:
         st.metric("Overall Accuracy", f"{accuracy:.1%}", f"{hits}/{total_questions}")
     with col2:
@@ -263,6 +336,17 @@ if st.button("Run Evaluation"):
         st.metric("Recall", f"{recall:.1%}")
     with col4:
         st.metric("F1 Score", f"{f1_score:.1%}")
+    with col5:
+        st.metric("Avg Similarity", f"{avg_similarity:.3f}")
+    with col6:
+        st.metric("Avg BLEU", f"{avg_bleu:.3f}")
+    with col7:
+        st.metric("Avg ROUGE-L", f"{avg_rouge_l:.3f}")
+    with col8:
+        st.metric("Avg Context Precision", f"{avg_context_precision:.3f}")
+    with col9:
+        st.metric("Avg Context Recall", f"{avg_context_recall:.3f}")
+    st.metric("Avg Context F1", f"{avg_context_f1:.3f}")
     
     # Similarity distribution
     similarities = [r["similarity"] for r in results]
@@ -339,8 +423,11 @@ if st.button("Run Evaluation"):
             "recall": recall,
             "f1_score": f1_score,
             "avg_similarity": avg_similarity,
-            "min_similarity": min_similarity,
-            "max_similarity": max_similarity,
+            "avg_bleu": avg_bleu,
+            "avg_rouge_l": avg_rouge_l,
+            "avg_context_precision": avg_context_precision,
+            "avg_context_recall": avg_context_recall,
+            "avg_context_f1": avg_context_f1,
             "total_questions": total_questions,
             "hits": hits
         })
