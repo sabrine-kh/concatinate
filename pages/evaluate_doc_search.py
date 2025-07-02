@@ -441,15 +441,15 @@ if st.button("Run Evaluation"):
 
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
-    if st.button("🏠 Home"):
+    if st.button("🏠 Home", key="home_btn"):
         st.switch_page("app.py")
-    if st.button("💬 Chat with Leoparts"):
+    if st.button("💬 Chat with Leoparts", key="chat_btn"):
         st.switch_page("pages/chatbot.py")
-    if st.button("📄 Extract a new Part"):
+    if st.button("📄 Extract a new Part", key="extract_btn"):
         st.switch_page("pages/extraction_attributs.py")
-    if st.button("🆕 New conversation"):
+    if st.button("🆕 New conversation", key="new_conv_btn"):
         st.session_state.messages = []
         st.session_state.last_part_number = None
         st.rerun()
-    if st.button("📊 Evaluate Doc Search"):
+    if st.button("📊 Evaluate Doc Search", key="eval_btn"):
         st.switch_page("pages/evaluate_doc_search.py")
