@@ -6,6 +6,46 @@ from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 import pandas as pd
 
+# --- Ground truth ---
+ground_truth = [
+  {
+    "question": "Number Of Fuse-Circuits",
+    "answer": "For fuses with 1 fuse circuit it's 1. A higher number of fuse circuits is only related to multifuses. The number describes the amount of fuse circuits in a multifuse (e.g. 5 circuits)."
+  },
+  {
+    "question": "What are the rules for the 'Strip Length [mm]' attribute for electric contacts?",
+    "answer": "- Use the value specified on the supplier drawing.\n- If only max and min are given, enter their average (e.g. (3.75 + 4.25)/2 = 4.00 mm).\n- If only max or min is given, use that value.\n- If no supplier data exists, calculate approximately: ≤ 1 mm² → S = X + 1 mm; 1 mm² < X ≤ 16 mm² → S = X + 2 mm; > 16 mm² → S = X + 3 mm.\n- If the wire size spans a boundary (e.g. 0.5–1.5 mm²), choose the average."
+  },
+  {
+    "question": "What is the Type Of Inductor?",
+    "answer": "Chip inductor: conçu pour montage SMD sur PCB; Coil: inducteur en bobine filaire; One core double choke: un noyau, deux bobines indépendantes; RF inductor: enroulements espacés pour hautes fréquences; Ring choke: (non défini dans le doc, placeholder); Filter, Ferrit, CAN-choke: listés sous RF inductors sans définition détaillée."
+  },
+  {
+    "question": "The grease consists of which material?",
+    "answer": "Grease is a semisolid lubricant, generally a soap emulsified with mineral or vegetable oil."
+  },
+  {
+    "question": "The sealant is used for what?",
+    "answer": "A sealant is used to ensure sealing of the harness on specific spots: as additional material within a grommet; kneaded between cables/wires of a harness."
+  },
+  {
+    "question": "What is the second name of Elongation at break?",
+    "answer": "Elongation at break, also known as fracture strain, is the ratio between changed length and initial length after breakage."
+  },
+  {
+    "question": "What are the common attributes for Cavity plug?",
+    "answer": "Shape: Round, Oval or Rectangular; External Diameter/Length & Width: dimensions critiques pour l'étanchéité; Material Name & Material Filling: définissent la résistance mécanique/environnementale; All Cavities Closed: implicite par le nom, mais non listé comme attribut distinct."
+  },
+  {
+    "question": "Define LED.",
+    "answer": "A light-emitting diode (LED) is a two-lead semiconductor light source, functioning like a pn-junction diode that emits light when forward-biased. Mounting Technology: THT, SMD."
+  },
+  {
+    "question": "What is the connection type of relay?",
+    "answer": "Plug-in: The relay is inserted into a relay holder; male terminals mate with a holder's female terminals.\nScrewed: Contacts secured via screws, typically for high-current applications.\nSoldering SMD: Surface-mounted device (SMD): glued to the PCB first, then soldered en masse."
+  }
+]
+
 # Helper: get chatbot answer (wraps existing logic, does not change it)
 def get_chatbot_answer(question):
     # This function should call your chatbot's answer logic as is.
@@ -76,46 +116,6 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
         wandb.log({"accuracy": accuracy, "total_questions": len(ground_truth), "hits": hits})
         wandb.finish()
     st.info("📊 **Results logged to wandb** - Check your dashboard for detailed analytics and charts.")
-
-# --- Ground truth ---
-ground_truth = [
-  {
-    "question": "Number Of Fuse-Circuits",
-    "answer": "For fuses with 1 fuse circuit it's 1. A higher number of fuse circuits is only related to multifuses. The number describes the amount of fuse circuits in a multifuse (e.g. 5 circuits)."
-  },
-  {
-    "question": "What are the rules for the 'Strip Length [mm]' attribute for electric contacts?",
-    "answer": "- Use the value specified on the supplier drawing.\n- If only max and min are given, enter their average (e.g. (3.75 + 4.25)/2 = 4.00 mm).\n- If only max or min is given, use that value.\n- If no supplier data exists, calculate approximately: ≤ 1 mm² → S = X + 1 mm; 1 mm² < X ≤ 16 mm² → S = X + 2 mm; > 16 mm² → S = X + 3 mm.\n- If the wire size spans a boundary (e.g. 0.5–1.5 mm²), choose the average."
-  },
-  {
-    "question": "What is the Type Of Inductor?",
-    "answer": "Chip inductor: conçu pour montage SMD sur PCB; Coil: inducteur en bobine filaire; One core double choke: un noyau, deux bobines indépendantes; RF inductor: enroulements espacés pour hautes fréquences; Ring choke: (non défini dans le doc, placeholder); Filter, Ferrit, CAN-choke: listés sous RF inductors sans définition détaillée."
-  },
-  {
-    "question": "The grease consists of which material?",
-    "answer": "Grease is a semisolid lubricant, generally a soap emulsified with mineral or vegetable oil."
-  },
-  {
-    "question": "The sealant is used for what?",
-    "answer": "A sealant is used to ensure sealing of the harness on specific spots: as additional material within a grommet; kneaded between cables/wires of a harness."
-  },
-  {
-    "question": "What is the second name of Elongation at break?",
-    "answer": "Elongation at break, also known as fracture strain, is the ratio between changed length and initial length after breakage."
-  },
-  {
-    "question": "What are the common attributes for Cavity plug?",
-    "answer": "Shape: Round, Oval or Rectangular; External Diameter/Length & Width: dimensions critiques pour l'étanchéité; Material Name & Material Filling: définissent la résistance mécanique/environnementale; All Cavities Closed: implicite par le nom, mais non listé comme attribut distinct."
-  },
-  {
-    "question": "Define LED.",
-    "answer": "A light-emitting diode (LED) is a two-lead semiconductor light source, functioning like a pn-junction diode that emits light when forward-biased. Mounting Technology: THT, SMD."
-  },
-  {
-    "question": "What is the connection type of relay?",
-    "answer": "Plug-in: The relay is inserted into a relay holder; male terminals mate with a holder's female terminals.\nScrewed: Contacts secured via screws, typically for high-current applications.\nSoldering SMD: Surface-mounted device (SMD): glued to the PCB first, then soldered en masse."
-  }
-]
 
 if st.button("Run Evaluation"):
     # Initialize wandb at the start of evaluation
