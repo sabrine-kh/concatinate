@@ -49,7 +49,7 @@ ground_truth = [
   },
   {
     "question": "Define LED.",
-    "answer": "A light-emitting diode (LED) is a two-lead semiconductor light source, functioning like a pn-junction diode that emits light when forward-biased. Mounting Technology: THT, SMD."
+    "answer": "A light-emitting diode (LED) is a two-lead semiconductor light source, functioning like a pn-junction diode that emits light when forward-biased. Mounting Technology: THT, SMD.Operating Voltage [V]: The LED used will have a voltage drop, specified at the intended operating current. If the voltage is below the threshold or on-voltage no current will flow and the result is an unlit LED. If the voltage is too high the current will go above the maximum rating, overheating and potentially destroying the LED."
   },
   {
     "question": "What is the connection type of relay?",
@@ -163,6 +163,24 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 st.markdown(f"**Chatbot Answer:** {chatbot_answer[:500]}{'...' if len(chatbot_answer) > 500 else ''}")
                 st.markdown(f"**Similarity Score:** {similarity:.3f}")
                 st.markdown(f"**Hit:** {'✅ Yes' if hit else '❌ No'}")
+                
+                # Detailed metric calculations
+                st.markdown("### 📊 Metric Calculations")
+                
+                # Context Precision calculation details
+                st.markdown("**Context Precision Calculation:**")
+                st.markdown(f"- Total answer chunks: {len(answer_chunks)}")
+                st.markdown(f"- Relevant chunks (similarity > {SIMILARITY_THRESHOLD}): {relevant_chunks}")
+                st.markdown(f"- Context Precision = {relevant_chunks}/{len(answer_chunks)} = {context_precision:.3f}")
+                
+                # Show chunk-by-chunk analysis
+                st.markdown("**Chunk Analysis:**")
+                for i, chunk in enumerate(answer_chunks):
+                    emb_chunk = model.encode(chunk, convert_to_tensor=True)
+                    sim_chunk = util.pytorch_cos_sim(emb_gt, emb_chunk).item()
+                    status = "✅ Relevant" if sim_chunk > SIMILARITY_THRESHOLD else "❌ Not Relevant"
+                    st.markdown(f"- Chunk {i+1}: '{chunk[:50]}{'...' if len(chunk) > 50 else ''}' → Similarity: {sim_chunk:.3f} → {status}")
+                
                 st.markdown(f"**Standard Context Precision:** {context_precision:.3f}")
                 st.markdown(f"**Context Recall:** {context_recall:.3f}")
                 st.markdown(f"**Context F1:** {context_f1:.3f}")
