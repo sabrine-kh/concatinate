@@ -126,16 +126,19 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             similarity = util.pytorch_cos_sim(emb_gt, emb_cb).item()
             hit = similarity > SIMILARITY_THRESHOLD
             hits += int(hit)
-            # BLEU
-            bleu = sentence_bleu(
-                [expected_answer.split()],
-                chatbot_answer.split(),
-                smoothing_function=smooth
-            )
+            # BLEU and ROUGE-L with input checks
+            if expected_answer.strip() and chatbot_answer.strip() and len(expected_answer.split()) > 1 and len(chatbot_answer.split()) > 1:
+                bleu = sentence_bleu(
+                    [expected_answer.split()],
+                    chatbot_answer.split(),
+                    smoothing_function=smooth
+                )
+                rouge = scorer.score(expected_answer, chatbot_answer)
+                rouge_l = rouge['rougeL'].fmeasure
+            else:
+                bleu = 0.0
+                rouge_l = 0.0
             bleu_scores.append(bleu)
-            # ROUGE-L
-            rouge = scorer.score(expected_answer, chatbot_answer)
-            rouge_l = rouge['rougeL'].fmeasure
             rouge_l_scores.append(rouge_l)
             # Standard Context Precision: compare chatbot answer to ground truth in chunks
             # For chatbot, treat the answer as a single chunk, but for standard, you would use multiple chunks
@@ -201,6 +204,10 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 st.markdown(f"**Hit:** {'✅ Yes' if hit else '❌ No'}")
                 st.markdown(f"**BLEU:** {bleu:.3f}")
                 st.markdown(f"**ROUGE-L:** {rouge_l:.3f}")
+                # Debug output for BLEU/ROUGE inputs
+                st.markdown(f"<details><summary>BLEU/ROUGE Inputs</summary>"
+                            f"<ul><li>Expected: <code>{expected_answer}</code></li>"
+                            f"<li>Chatbot: <code>{chatbot_answer}</code></li></ul></details>", unsafe_allow_html=True)
                 
                 # Detailed metric calculations
                 st.markdown("### 📊 Metric Calculations")
