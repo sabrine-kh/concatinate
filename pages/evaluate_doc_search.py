@@ -16,6 +16,9 @@ from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 import pandas as pd
 import re
+# Add BLEU and ROUGE imports
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+from rouge_score import rouge_scorer
 
 # --- Ground truth ---
 ground_truth = [
@@ -105,9 +108,13 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     results = []
     progress = st.progress(0)
     # Metrics setup
+    bleu_scores = []
+    rouge_l_scores = []
     context_precisions = []
     context_recalls = []
     context_f1s = []
+    scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
+    smooth = SmoothingFunction().method1
     SIMILARITY_THRESHOLD = 0.4  # Use a variable for easy adjustment
     for idx, item in enumerate(ground_truth):
         question = item["question"]
@@ -119,6 +126,17 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             similarity = util.pytorch_cos_sim(emb_gt, emb_cb).item()
             hit = similarity > SIMILARITY_THRESHOLD
             hits += int(hit)
+            # BLEU
+            bleu = sentence_bleu(
+                [expected_answer.split()],
+                chatbot_answer.split(),
+                smoothing_function=smooth
+            )
+            bleu_scores.append(bleu)
+            # ROUGE-L
+            rouge = scorer.score(expected_answer, chatbot_answer)
+            rouge_l = rouge['rougeL'].fmeasure
+            rouge_l_scores.append(rouge_l)
             # Standard Context Precision: compare chatbot answer to ground truth in chunks
             # For chatbot, treat the answer as a single chunk, but for standard, you would use multiple chunks
             # Here, let's simulate by splitting the chatbot answer into sentences (as pseudo-chunks)
@@ -152,6 +170,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 "chatbot_answer": chatbot_answer,
                 "similarity": similarity,
                 "hit": hit,
+                "bleu": bleu,
+                "rouge_l": rouge_l,
                 "context_precision": context_precision,
                 "context_recall": context_recall,
                 "context_f1": context_f1,
@@ -165,6 +185,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                     "chatbot_answer": chatbot_answer,
                     "similarity": similarity,
                     "hit": hit,
+                    "bleu": bleu,
+                    "rouge_l": rouge_l,
                     "context_precision": context_precision,
                     "context_recall": context_recall,
                     "context_f1": context_f1,
@@ -177,6 +199,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 st.markdown(f"**Chatbot Answer:** {chatbot_answer[:500]}{'...' if len(chatbot_answer) > 500 else ''}")
                 st.markdown(f"**Similarity Score:** {similarity:.3f}")
                 st.markdown(f"**Hit:** {'✅ Yes' if hit else '❌ No'}")
+                st.markdown(f"**BLEU:** {bleu:.3f}")
+                st.markdown(f"**ROUGE-L:** {rouge_l:.3f}")
                 
                 # Detailed metric calculations
                 st.markdown("### 📊 Metric Calculations")
@@ -216,6 +240,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 wandb.log({"error": f"{question}: {e}"})
         progress.progress((idx + 1) / len(ground_truth))
     accuracy = hits / len(ground_truth)
+    avg_bleu = sum(bleu_scores) / len(bleu_scores) if bleu_scores else 0.0
+    avg_rouge_l = sum(rouge_l_scores) / len(rouge_l_scores) if rouge_l_scores else 0.0
     context_precisions = [r["context_precision"] for r in results]
     context_recalls = [r["context_recall"] for r in results]
     context_f1s = [r["context_f1"] for r in results]
@@ -225,24 +251,30 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     avg_context_f1 = sum(context_f1s) / len(context_f1s) if context_f1s else 0.0
     avg_answer_correctness = sum(similarities) / len(similarities) if similarities else 0.0
     st.success(f"🤖 **Chatbot Evaluation Complete!** Final Accuracy: {accuracy:.1%} ({hits}/{len(ground_truth)} questions answered correctly)")
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
     with col1:
         st.metric("Accuracy", f"{accuracy:.1%}")
     with col2:
-        st.metric("Avg Standard Context Precision", f"{avg_context_precision:.3f}")
+        st.metric("Avg BLEU", f"{avg_bleu:.3f}")
     with col3:
-        st.metric("Avg Context Recall", f"{avg_context_recall:.3f}")
+        st.metric("Avg ROUGE-L", f"{avg_rouge_l:.3f}")
     with col4:
-        st.metric("Avg Context F1", f"{avg_context_f1:.3f}")
+        st.metric("Avg Standard Context Precision", f"{avg_context_precision:.3f}")
     with col5:
-        st.metric("Avg Answer Correctness Score", f"{avg_answer_correctness:.3f}")
+        st.metric("Avg Context Recall", f"{avg_context_recall:.3f}")
     with col6:
-        st.metric("Total Questions", f"{len(ground_truth)}")
+        st.metric("Avg Context F1", f"{avg_context_f1:.3f}")
     with col7:
+        st.metric("Avg Answer Correctness Score", f"{avg_answer_correctness:.3f}")
+    with col8:
+        st.metric("Total Questions", f"{len(ground_truth)}")
+    with col9:
         st.metric("Hits", f"{hits}")
     if wandb_initialized:
         wandb.log({
             "accuracy": accuracy,
+            "avg_bleu": avg_bleu,
+            "avg_rouge_l": avg_rouge_l,
             "avg_context_precision": avg_context_precision,
             "avg_context_recall": avg_context_recall,
             "avg_context_f1": avg_context_f1,
