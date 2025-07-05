@@ -483,7 +483,7 @@ ground_truth = [
     "answer": "A BJT (Bipolar Junction Transistor) is a single semiconductor device used for amplification. A Darlington transistor is a compound structure made of two BJT transistors connected in a way that the current amplified by the first is amplified further by the second, providing very high current gain."
   }
 ]
-ground_truth.extend(additional_questions)
+ground_truth.extend(ground_truth)
 
 # Helper: get chatbot answer (wraps existing logic, does not change it)
 def get_chatbot_answer(question):
