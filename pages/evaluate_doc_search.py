@@ -258,25 +258,18 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     avg_context_f1 = sum(context_f1s) / len(context_f1s) if context_f1s else 0.0
     avg_answer_correctness = sum(similarities) / len(similarities) if similarities else 0.0
     st.success(f"🤖 **Chatbot Evaluation Complete!** Final Accuracy: {accuracy:.1%} ({hits}/{len(ground_truth)} questions answered correctly)")
-    col1, col2, col3, col4, col5, col6, col7, col8, col9 = st.columns(9)
-    with col1:
-        st.metric("Accuracy", f"{accuracy:.1%}")
-    with col2:
-        st.metric("Avg BLEU", f"{avg_bleu:.3f}")
-    with col3:
-        st.metric("Avg ROUGE-L", f"{avg_rouge_l:.3f}")
-    with col4:
-        st.metric("Avg Standard Context Precision", f"{avg_context_precision:.3f}")
-    with col5:
-        st.metric("Avg Context Recall", f"{avg_context_recall:.3f}")
-    with col6:
-        st.metric("Avg Context F1", f"{avg_context_f1:.3f}")
-    with col7:
-        st.metric("Avg Answer Correctness Score", f"{avg_answer_correctness:.3f}")
-    with col8:
-        st.metric("Total Questions", f"{len(ground_truth)}")
-    with col9:
-        st.metric("Hits", f"{hits}")
+    metrics = {
+        "Accuracy": f"{accuracy:.1%}",
+        "Avg BLEU": f"{avg_bleu:.3f}",
+        "Avg ROUGE-L": f"{avg_rouge_l:.3f}",
+        "Avg Standard Context Precision": f"{avg_context_precision:.3f}",
+        "Avg Context Recall": f"{avg_context_recall:.3f}",
+        "Avg Context F1": f"{avg_context_f1:.3f}",
+        "Avg Answer Correctness Score": f"{avg_answer_correctness:.3f}",
+        "Total Questions": f"{len(ground_truth)}",
+        "Hits": f"{hits}"
+    }
+    st.table(pd.DataFrame(metrics.items(), columns=['Metric', 'Value']))
     if wandb_initialized:
         wandb.log({
             "accuracy": accuracy,
