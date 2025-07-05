@@ -108,7 +108,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     context_precisions = []
     context_recalls = []
     context_f1s = []
-    SIMILARITY_THRESHOLD = 0.5  # Use a variable for easy adjustment
+    SIMILARITY_THRESHOLD = 0.4  # Use a variable for easy adjustment
     for idx, item in enumerate(ground_truth):
         question = item["question"]
         expected_answer = item["answer"]
