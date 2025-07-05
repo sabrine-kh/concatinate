@@ -122,7 +122,12 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             # Standard Context Precision: compare chatbot answer to ground truth in chunks
             # For chatbot, treat the answer as a single chunk, but for standard, you would use multiple chunks
             # Here, let's simulate by splitting the chatbot answer into sentences (as pseudo-chunks)
-            answer_chunks = [s.strip() for s in re.split(r'[.!?]', chatbot_answer) if s.strip()]
+            # Better chunking: filter out short chunks and take only top 3 meaningful chunks
+            all_sentences = [s.strip() for s in re.split(r'[.!?]', chatbot_answer) if s.strip()]
+            # Filter out very short chunks (likely formatting artifacts)
+            meaningful_chunks = [chunk for chunk in all_sentences if len(chunk) > 15 and not chunk.isdigit() and not chunk in ['g', 'e', 'etc']]
+            # Take only the top 3 most meaningful chunks
+            answer_chunks = meaningful_chunks[:3] if meaningful_chunks else all_sentences[:3]
             
             # Get chunks from Supabase for this question
             supabase_chunks = find_relevant_markdown_chunks(question, limit=10)
@@ -150,7 +155,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 "context_precision": context_precision,
                 "context_recall": context_recall,
                 "context_f1": context_f1,
-                "num_supabase_chunks": num_supabase_chunks
+                "num_supabase_chunks": num_supabase_chunks,
+                "num_answer_chunks": len(answer_chunks)
             })
             if wandb_initialized:
                 wandb.log({
@@ -162,7 +168,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                     "context_precision": context_precision,
                     "context_recall": context_recall,
                     "context_f1": context_f1,
-                    "num_supabase_chunks": num_supabase_chunks
+                    "num_supabase_chunks": num_supabase_chunks,
+                    "num_answer_chunks": len(answer_chunks)
                 })
             with st.expander(f"{'✅' if hit else '❌'} Q{idx+1}: {question[:50]}...", expanded=False):
                 st.markdown(f"**Question:** {question}")
@@ -188,17 +195,17 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 
                 # Context Precision calculation details
                 st.markdown("**Context Precision Calculation:**")
-                st.markdown(f"- Total answer chunks: {len(answer_chunks)}")
+                st.markdown(f"- Total meaningful answer chunks (top 3): {len(answer_chunks)}")
                 st.markdown(f"- Relevant chunks (similarity > {SIMILARITY_THRESHOLD}): {relevant_chunks}")
                 st.markdown(f"- Context Precision = {relevant_chunks}/{len(answer_chunks)} = {context_precision:.3f}")
                 
                 # Show chunk-by-chunk analysis
-                st.markdown("**Chunk Analysis:**")
+                st.markdown("**Chunk Analysis (Top 3 Meaningful Chunks):**")
                 for i, chunk in enumerate(answer_chunks):
                     emb_chunk = model.encode(chunk, convert_to_tensor=True)
                     sim_chunk = util.pytorch_cos_sim(emb_gt, emb_chunk).item()
                     status = "✅ Relevant" if sim_chunk > SIMILARITY_THRESHOLD else "❌ Not Relevant"
-                    st.markdown(f"- Chunk {i+1}: '{chunk[:50]}{'...' if len(chunk) > 50 else ''}' → Similarity: {sim_chunk:.3f} → {status}")
+                    st.markdown(f"- Chunk {i+1}: '{chunk[:60]}{'...' if len(chunk) > 60 else ''}' → Similarity: {sim_chunk:.3f} → {status}")
                 
                 st.markdown(f"**Standard Context Precision:** {context_precision:.3f}")
                 st.markdown(f"**Context Recall:** {context_recall:.3f}")
