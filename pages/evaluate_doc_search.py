@@ -123,6 +123,11 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             # For chatbot, treat the answer as a single chunk, but for standard, you would use multiple chunks
             # Here, let's simulate by splitting the chatbot answer into sentences (as pseudo-chunks)
             answer_chunks = [s.strip() for s in re.split(r'[.!?]', chatbot_answer) if s.strip()]
+            
+            # Get chunks from Supabase for this question
+            supabase_chunks = find_relevant_markdown_chunks(question, limit=10)
+            num_supabase_chunks = len(supabase_chunks) if supabase_chunks else 0
+            
             relevant_chunks = 0
             for chunk in answer_chunks:
                 emb_chunk = model.encode(chunk, convert_to_tensor=True)
@@ -144,7 +149,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 "hit": hit,
                 "context_precision": context_precision,
                 "context_recall": context_recall,
-                "context_f1": context_f1
+                "context_f1": context_f1,
+                "num_supabase_chunks": num_supabase_chunks
             })
             if wandb_initialized:
                 wandb.log({
@@ -155,7 +161,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                     "hit": hit,
                     "context_precision": context_precision,
                     "context_recall": context_recall,
-                    "context_f1": context_f1
+                    "context_f1": context_f1,
+                    "num_supabase_chunks": num_supabase_chunks
                 })
             with st.expander(f"{'✅' if hit else '❌'} Q{idx+1}: {question[:50]}...", expanded=False):
                 st.markdown(f"**Question:** {question}")
@@ -166,6 +173,18 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 
                 # Detailed metric calculations
                 st.markdown("### 📊 Metric Calculations")
+                
+                # Supabase chunks information
+                st.markdown("**Supabase Retrieval:**")
+                st.markdown(f"- Number of chunks retrieved from database: {num_supabase_chunks}")
+                if supabase_chunks:
+                    st.markdown("**Retrieved Chunks Sources:**")
+                    for i, chunk in enumerate(supabase_chunks[:3]):  # Show first 3 chunks
+                        source = chunk.get('source', 'Unknown')
+                        page = chunk.get('page', 'N/A')
+                        st.markdown(f"- Chunk {i+1}: Source: {source}, Page: {page}")
+                    if len(supabase_chunks) > 3:
+                        st.markdown(f"- ... and {len(supabase_chunks) - 3} more chunks")
                 
                 # Context Precision calculation details
                 st.markdown("**Context Precision Calculation:**")
