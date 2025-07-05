@@ -44,8 +44,8 @@ ground_truth = [
     "answer": "Elongation at break, also known as fracture strain, is the ratio between changed length and initial length after breakage."
   },
   {
-    "question": "What are the common attributes for Cavity plug?",
-    "answer": "Shape: Round, Oval or Rectangular; External Diameter/Length & Width: dimensions critiques pour l'étanchéité; Material Name & Material Filling: définissent la résistance mécanique/environnementale; All Cavities Closed: implicite par le nom, mais non listé comme attribut distinct."
+    "question": "what are the types Of Granule?",
+    "answer": "Plastic will not always be delivered in its finial molding composition granule. For the final composition multiple basis materials, colour batches and additives can be mixed. This attribute describes if the granule is a basic material or just a colour batch.\n• Basic material\n• Colour batch"
   },
   {
     "question": "Define LED.",
