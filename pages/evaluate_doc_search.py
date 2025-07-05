@@ -57,11 +57,7 @@ ground_truth = [
   {
     "question": "What is the connection type of relay?",
     "answer": "Plug-in: The relay is inserted into a relay holder; male terminals mate with a holder's female terminals.\nScrewed: Contacts secured via screws, typically for high-current applications.\nSoldering SMD: Surface-mounted device (SMD): glued to the PCB first, then soldered en masse."
-  }
-]
-
-# Add new questions to ground_truth
-additional_questions = [
+  },
   {
     "question": "What is the 'HV Qualified' attribute used for?",
     "answer": "The 'HV Qualified' attribute defines if a part is approved for high voltage application, which is specified as a range greater than 60 V. The attribute is set to 'Yes' ONLY when the documentation indicates this property, or the parts are used in an HV-connector or an HV-assembly. Otherwise, it is 'No'."
