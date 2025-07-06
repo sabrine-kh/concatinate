@@ -1,6 +1,11 @@
 import os
 import streamlit as st
 import wandb
+import warnings
+
+# Suppress the huggingface_hub deprecation warning
+warnings.filterwarnings("ignore", message=".*resume_download.*", category=FutureWarning)
+
 from pages.chatbot import (
     find_relevant_markdown_chunks,
     format_markdown_context,
