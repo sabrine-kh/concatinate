@@ -356,6 +356,7 @@ ground_truth = [
     "question": "What is the purpose of a 'Bush'?",
     "answer": "A bush is a mechanical component, often a hollow cylinder or sleeve, that can be used for various purposes like providing a bearing surface, spacing, or as a support sleeve for shielding contacts in connectors."
   },
+
   {
     "question": "What is a 'Tie lead-through + Arrowhead' clip?",
     "answer": "This is a clip that combines a guide for a tie (lead-through) with an arrowhead-style fastener that pushes into a hole to secure it."
@@ -425,6 +426,7 @@ ground_truth = [
     "answer": "The types are: Printer Label, Marker, Clip, Ident sleeve, Plate, Tape, RFID Label, Amperage Identification, and RFID Token."
   }
 ]
+
 # Helper: get chatbot answer (wraps existing logic, does not change it)
 def get_chatbot_answer(question):
     # Use the same logic as the chatbot UI
@@ -665,13 +667,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     st.success(f"🤖 **Chatbot Evaluation Complete!** Final Accuracy: {accuracy:.1%} ({hits}/{len(ground_truth)} questions answered correctly)")
     metrics = {
         "Accuracy": f"{accuracy:.1%}",
-        "Avg BLEU": f"{avg_bleu:.3f}",
-        "Avg ROUGE-L": f"{avg_rouge_l:.3f}",
-        "Avg Standard Context Precision": f"{avg_context_precision:.3f}",
-        "Avg Context Recall": f"{avg_context_recall:.3f}",
-        "Avg Context F1": f"{avg_context_f1:.3f}",
+        "Avg Context Precision": f"{avg_context_precision:.3f}",
         "Avg Answer Correctness Score": f"{avg_answer_correctness:.3f}",
-        "Avg Response Relevancy": f"{avg_response_relevancy:.3f}",
         "Total Questions": f"{len(ground_truth)}",
         "Hits": f"{hits}"
     }
@@ -679,16 +676,23 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     if wandb_initialized:
         wandb.log({
             "accuracy": accuracy,
-            "avg_bleu": avg_bleu,
-            "avg_rouge_l": avg_rouge_l,
-            "avg_context_precision": avg_context_precision,
-            "avg_context_recall": avg_context_recall,
-            "avg_context_f1": avg_context_f1,
-            "avg_answer_correctness": avg_answer_correctness,
-            "avg_response_relevancy": avg_response_relevancy,
             "total_questions": len(ground_truth),
             "hits": hits
         })
         wandb.finish()
     st.info("📊 **Results logged to wandb** - Check your dashboard for detailed analytics and charts.")
 
+with st.sidebar:
+    st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
+    if st.button("🏠 Home", key="home_btn"):
+        st.switch_page("app.py")
+    if st.button("💬 Chat with Leoparts", key="chat_btn"):
+        st.switch_page("pages/chatbot.py")
+    if st.button("📄 Extract a new Part", key="extract_btn"):
+        st.switch_page("pages/extraction_attributs.py")
+    if st.button("🆕 New conversation", key="new_conv_btn"):
+        st.session_state.messages = []
+        st.session_state.last_part_number = None
+        st.rerun()
+    if st.button("📊 Evaluate Doc Search", key="eval_btn"):
+        st.switch_page("pages/evaluate_doc_search.py")
