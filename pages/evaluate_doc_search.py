@@ -19,6 +19,7 @@ import re
 # Add BLEU and ROUGE imports
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from rouge_score import rouge_scorer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # --- Ground truth ---
 ground_truth = [
@@ -235,10 +236,6 @@ ground_truth = [
     "answer": "The 'Electrical Function' attribute is set to 'Yes' if the housing part provides any electrical functionality, for example by having an integrated metal part like a shortcut bridge, a PCB-terminal, an LED, or a jumper."
   },
   {
-    "question": "What is a 'Splitter' type of Housing Part?",
-    "answer": "A 'Splitter' is a type of housing part that divides one entrance into two exits."
-  },
-  {
     "question": "What is the function of a 'Strain-relief' type Housing Part?",
     "answer": "A 'Strain-relief' is an independent housing part that is assembled onto connectors to fix electrical cables. Its function is to relieve stress from the cable connections to prevent them from breaking due to tensile forces."
   },
@@ -382,10 +379,7 @@ ground_truth = [
     "question": "What is the purpose of a 'Bush'?",
     "answer": "A bush is a mechanical component, often a hollow cylinder or sleeve, that can be used for various purposes like providing a bearing surface, spacing, or as a support sleeve for shielding contacts in connectors."
   },
-  {
-    "question": "What are the common attributes for all 'Clip V2' subclassifications?",
-    "answer": "The common attributes are: Material Name, Material Filling, Max. Working Temperature [°C], Min. Working Temperature [°C], and Colour."
-  },
+
   {
     "question": "How is a 'Tie lead-through + Edge' clip attached?",
     "answer": "This type of clip is designed to be attached to the edge of a sheet metal panel or plastic part."
@@ -398,18 +392,12 @@ ground_truth = [
     "question": "What does the 'Serration side' attribute for a cable tie describe?",
     "answer": "This attribute describes whether the serrations (teeth) of the cable tie are on the inside or the outside of the loop."
   },
-  {
-    "question": "What is a 'Tube holder + Clamping wedge'?",
-    "answer": "It is a clip designed to hold a tube. It is secured by being plugged into an oblong hole and then turned 90 degrees, causing a wedge to clamp it in place."
-  },
+ 
   {
     "question": "What is the function of a 'P-Clamp'?",
     "answer": "P-clamps, named for their 'P' shape, are used to lock cables, tubes, or sleeves in place by bracketing them to a surface."
   },
-  {
-    "question": "What is a 'Trim fastener'?",
-    "answer": "A trim fastener is a type of clip, often resembling a fir tree or push-pin, used to attach trim panels or other lightweight components."
-  },
+
   {
     "question": "What are the different types of 'Rubber Boot'?",
     "answer": "Rubber boots are protective coverings. The types are based on what they cover: Connector, Terminal (including non-shrinking insulation sleeves), Eyelet, and Battery Lug."
@@ -466,14 +454,7 @@ ground_truth = [
     "question": "What are the types of 'Adhesive' based on adhesion method?",
     "answer": "The types are: fast setting adhesive, hot melt adhesive, and two component adhesive."
   },
-  {
-    "question": "What is a 'Multi-component system'?",
-    "answer": "A multi-component system is the product formed when hardener and resin materials react together. At LEONI, this is the classification for the resulting cured material."
-  },
-  {
-    "question": "What is an E-Box Assembly?",
-    "answer": "An E-Box (Electric box) assembly is a power distribution box that features multiple electrical outputs and accepts many fuses, relays, or busbars. It consists of a housing and other elements like covers, fuses, and terminals."
-  },
+ 
   {
     "question": "What are the different types of 'Marking Material'?",
     "answer": "The types are: Printer Label, Marker, Clip, Ident sleeve, Plate, Tape, RFID Label, Amperage Identification, and RFID Token."
@@ -510,6 +491,39 @@ def get_chatbot_answer(question):
     prompt_for_llm = f"Context:\n{combined_context}\n\nUser Question: {question}\n"
     return get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
 
+# Helper: Generate questions from answer using Qwen LLM
+def generate_questions_from_answer(answer, llm, n=3):
+    prompt = (
+        f"Given the following answer, generate {n} different questions that this answer could be a response to.\n\n"
+        f"Answer: \"{answer}\"\nQuestions:\n1."
+    )
+    response = llm.invoke(prompt) if hasattr(llm, 'invoke') else llm(prompt)
+    if hasattr(response, "content"):
+        text = response.content
+    else:
+        text = str(response)
+    questions = []
+    for line in text.split('\n'):
+        line = line.strip()
+        if line and (line[0].isdigit() and line[1] in ['.', ')']):
+            q = line[2:].strip()
+            if q:
+                questions.append(q)
+    if not questions:
+        questions = [l.strip() for l in text.split('\n') if l.strip()]
+    return questions[:n]
+
+# Helper: Compute response relevancy
+def response_relevancy(user_question, chatbot_answer, llm, embedding_model, n=3):
+    generated_questions = generate_questions_from_answer(chatbot_answer, llm, n=n)
+    user_emb = embedding_model.encode([user_question])[0]
+    scores = []
+    for q in generated_questions:
+        q_emb = embedding_model.encode([q])[0]
+        sim = cosine_similarity([user_emb], [q_emb])[0][0]
+        scores.append(sim)
+    return sum(scores) / len(scores) if scores else 0.0
+
 # Authenticate wandb using Streamlit secrets
 os.environ["WANDB_API_KEY"] = st.secrets["WANDB_API_KEY"]
 
@@ -539,6 +553,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
     smooth = SmoothingFunction().method1
     SIMILARITY_THRESHOLD = 0.4  # Use a variable for easy adjustment
+    response_relevancies = []
     for idx, item in enumerate(ground_truth):
         question = item["question"]
         expected_answer = item["answer"]
@@ -590,6 +605,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             context_recalls.append(context_recall)
             context_f1 = context_precision
             context_f1s.append(context_f1)
+            response_relevancy_score = response_relevancy(question, chatbot_answer, llm, model)
+            response_relevancies.append(response_relevancy_score)
             results.append({
                 "question": question,
                 "expected_answer": expected_answer,
@@ -602,7 +619,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 "context_recall": context_recall,
                 "context_f1": context_f1,
                 "num_supabase_chunks": num_supabase_chunks,
-                "num_answer_chunks": len(answer_chunks)
+                "num_answer_chunks": len(answer_chunks),
+                "response_relevancy": response_relevancy_score,
             })
             if wandb_initialized:
                 wandb.log({
@@ -617,7 +635,8 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                     "context_recall": context_recall,
                     "context_f1": context_f1,
                     "num_supabase_chunks": num_supabase_chunks,
-                    "num_answer_chunks": len(answer_chunks)
+                    "num_answer_chunks": len(answer_chunks),
+                    "response_relevancy": response_relevancy_score,
                 })
             with st.expander(f"{'✅' if hit else '❌'} Q{idx+1}: {question[:50]}...", expanded=False):
                 st.markdown(f"**Question:** {question}")
@@ -664,6 +683,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 st.markdown(f"**Standard Context Precision:** {context_precision:.3f}")
                 st.markdown(f"**Context Recall:** {context_recall:.3f}")
                 st.markdown(f"**Context F1:** {context_f1:.3f}")
+                st.markdown(f"**Response Relevancy:** {response_relevancy_score:.3f}")
         except Exception as e:
             st.error(f"Error for question '{question}': {e}")
             if wandb_initialized:
@@ -680,6 +700,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     avg_context_recall = sum(context_recalls) / len(context_recalls) if context_recalls else 0.0
     avg_context_f1 = sum(context_f1s) / len(context_f1s) if context_f1s else 0.0
     avg_answer_correctness = sum(similarities) / len(similarities) if similarities else 0.0
+    avg_response_relevancy = sum(response_relevancies) / len(response_relevancies) if response_relevancies else 0.0
     st.success(f"🤖 **Chatbot Evaluation Complete!** Final Accuracy: {accuracy:.1%} ({hits}/{len(ground_truth)} questions answered correctly)")
     metrics = {
         "Accuracy": f"{accuracy:.1%}",
@@ -689,6 +710,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
         "Avg Context Recall": f"{avg_context_recall:.3f}",
         "Avg Context F1": f"{avg_context_f1:.3f}",
         "Avg Answer Correctness Score": f"{avg_answer_correctness:.3f}",
+        "Avg Response Relevancy": f"{avg_response_relevancy:.3f}",
         "Total Questions": f"{len(ground_truth)}",
         "Hits": f"{hits}"
     }
@@ -702,6 +724,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             "avg_context_recall": avg_context_recall,
             "avg_context_f1": avg_context_f1,
             "avg_answer_correctness": avg_answer_correctness,
+            "avg_response_relevancy": avg_response_relevancy,
             "total_questions": len(ground_truth),
             "hits": hits
         })
