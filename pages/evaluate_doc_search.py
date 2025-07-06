@@ -16,9 +16,8 @@ from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 import pandas as pd
 import re
-# Add BLEU and ROUGE imports
-from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
-from rouge_score import rouge_scorer
+# Add BERTScore import
+from bert_score import score as bert_score
 from sklearn.metrics.pairwise import cosine_similarity
 
 # --- Ground truth ---
@@ -454,39 +453,6 @@ def get_chatbot_answer(question):
     prompt_for_llm = f"Context:\n{combined_context}\n\nUser Question: {question}\n"
     return get_groq_chat_response(prompt_for_llm, context_provided=context_was_found)
 
-# Helper: Generate questions from answer using Qwen LLM
-def generate_questions_from_answer(answer, llm, n=3):
-    prompt = (
-        f"Given the following answer, generate {n} different questions that this answer could be a response to.\n\n"
-        f"Answer: \"{answer}\"\nQuestions:\n1."
-    )
-    response = llm.invoke(prompt) if hasattr(llm, 'invoke') else llm(prompt)
-    if hasattr(response, "content"):
-        text = response.content
-    else:
-        text = str(response)
-    questions = []
-    for line in text.split('\n'):
-        line = line.strip()
-        if line and (line[0].isdigit() and line[1] in ['.', ')']):
-            q = line[2:].strip()
-            if q:
-                questions.append(q)
-    if not questions:
-        questions = [l.strip() for l in text.split('\n') if l.strip()]
-    return questions[:n]
-
-# Helper: Compute response relevancy
-def response_relevancy(user_question, chatbot_answer, llm, embedding_model, n=3):
-    generated_questions = generate_questions_from_answer(chatbot_answer, llm, n=n)
-    user_emb = embedding_model.encode([user_question])[0]
-    scores = []
-    for q in generated_questions:
-        q_emb = embedding_model.encode([q])[0]
-        sim = cosine_similarity([user_emb], [q_emb])[0][0]
-        scores.append(sim)
-    return sum(scores) / len(scores) if scores else 0.0
-
 # Authenticate wandb using Streamlit secrets
 os.environ["WANDB_API_KEY"] = st.secrets["WANDB_API_KEY"]
 
@@ -504,47 +470,36 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     
     st.subheader("🤖 Chatbot Output vs Ground Truth Evaluation")
     model = SentenceTransformer("all-MiniLM-L6-v2")
-    hits = 0
     results = []
     progress = st.progress(0)
-    # Metrics setup
-    bleu_scores = []
-    rouge_l_scores = []
+    # Metrics setup - only the three specified metrics
     context_precisions = []
-    context_recalls = []
-    context_f1s = []
-    scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
-    smooth = SmoothingFunction().method1
+    answer_correctness_scores = []
+    bertscore_f1_scores = []
     SIMILARITY_THRESHOLD = 0.4  # Use a variable for easy adjustment
-    response_relevancies = []
+    
     for idx, item in enumerate(ground_truth):
         question = item["question"]
         expected_answer = item["answer"]
         try:
             chatbot_answer = get_chatbot_answer(question)
+            
+            # 1. Answer Correctness (using cosine similarity)
             emb_gt = model.encode(expected_answer, convert_to_tensor=True)
             emb_cb = model.encode(chatbot_answer, convert_to_tensor=True)
-            similarity = util.pytorch_cos_sim(emb_gt, emb_cb).item()
-            hit = similarity > SIMILARITY_THRESHOLD
-            hits += int(hit)
-            # BLEU and ROUGE-L with input checks
-            if expected_answer.strip() and chatbot_answer.strip() and len(expected_answer.split()) > 1 and len(chatbot_answer.split()) > 1:
-                bleu = sentence_bleu(
-                    [expected_answer.split()],
-                    chatbot_answer.split(),
-                    smoothing_function=smooth
-                )
-                rouge = scorer.score(expected_answer, chatbot_answer)
-                rouge_l = rouge['rougeL'].fmeasure
-            else:
-                bleu = 0.0
-                rouge_l = 0.0
-            bleu_scores.append(bleu)
-            rouge_l_scores.append(rouge_l)
-            # Standard Context Precision: compare chatbot answer to ground truth in chunks
-            # For chatbot, treat the answer as a single chunk, but for standard, you would use multiple chunks
-            # Here, let's simulate by splitting the chatbot answer into sentences (as pseudo-chunks)
-            # Better chunking: filter out short chunks and take only top 3 meaningful chunks
+            answer_correctness = util.pytorch_cos_sim(emb_gt, emb_cb).item()
+            answer_correctness_scores.append(answer_correctness)
+            
+            # 2. BERTScore F1
+            try:
+                P, R, F1 = bert_score([chatbot_answer], [expected_answer], lang='en', verbose=False)
+                bertscore_f1 = F1[0].item()
+            except Exception as e:
+                st.warning(f"BERTScore calculation failed for question {idx+1}: {e}")
+                bertscore_f1 = 0.0
+            bertscore_f1_scores.append(bertscore_f1)
+            
+            # 3. Context Precision: compare chatbot answer to ground truth in chunks
             all_sentences = [s.strip() for s in re.split(r'[.!?]', chatbot_answer) if s.strip()]
             # Filter out very short chunks (likely formatting artifacts)
             meaningful_chunks = [chunk for chunk in all_sentences if len(chunk) > 15 and not chunk.isdigit() and not chunk in ['g', 'e', 'etc']]
@@ -563,56 +518,40 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                     relevant_chunks += 1
             context_precision = relevant_chunks / len(answer_chunks) if answer_chunks else 0
             context_precisions.append(context_precision)
-            # Context Recall and F1 remain as before (since we have only one answer per question)
-            context_recall = context_precision
-            context_recalls.append(context_recall)
-            context_f1 = context_precision
-            context_f1s.append(context_f1)
-            response_relevancy_score = response_relevancy(question, chatbot_answer, llm, model)
-            response_relevancies.append(response_relevancy_score)
+            
             results.append({
                 "question": question,
                 "expected_answer": expected_answer,
                 "chatbot_answer": chatbot_answer,
-                "similarity": similarity,
-                "hit": hit,
-                "bleu": bleu,
-                "rouge_l": rouge_l,
+                "answer_correctness": answer_correctness,
                 "context_precision": context_precision,
-                "context_recall": context_recall,
-                "context_f1": context_f1,
+                "bertscore_f1": bertscore_f1,
                 "num_supabase_chunks": num_supabase_chunks,
                 "num_answer_chunks": len(answer_chunks),
-                "response_relevancy": response_relevancy_score,
             })
+            
             if wandb_initialized:
                 wandb.log({
                     "question": question,
                     "expected_answer": expected_answer,
                     "chatbot_answer": chatbot_answer,
-                    "similarity": similarity,
-                    "hit": hit,
-                    "bleu": bleu,
-                    "rouge_l": rouge_l,
+                    "answer_correctness": answer_correctness,
                     "context_precision": context_precision,
-                    "context_recall": context_recall,
-                    "context_f1": context_f1,
+                    "bertscore_f1": bertscore_f1,
                     "num_supabase_chunks": num_supabase_chunks,
                     "num_answer_chunks": len(answer_chunks),
-                    "response_relevancy": response_relevancy_score,
                 })
-            with st.expander(f"{'✅' if hit else '❌'} Q{idx+1}: {question[:50]}...", expanded=False):
+                
+            with st.expander(f"Q{idx+1}: {question[:50]}...", expanded=False):
                 st.markdown(f"**Question:** {question}")
                 st.markdown(f"**Expected Answer:** {expected_answer}")
                 st.markdown(f"**Chatbot Answer:** {chatbot_answer[:500]}{'...' if len(chatbot_answer) > 500 else ''}")
-                st.markdown(f"**Similarity Score:** {similarity:.3f}")
-                st.markdown(f"**Hit:** {'✅ Yes' if hit else '❌ No'}")
-                st.markdown(f"**BLEU:** {bleu:.3f}")
-                st.markdown(f"**ROUGE-L:** {rouge_l:.3f}")
-                # Debug output for BLEU/ROUGE inputs
-                st.markdown(f"<details><summary>BLEU/ROUGE Inputs</summary>"
-                            f"<ul><li>Expected: <code>{expected_answer}</code></li>"
-                            f"<li>Chatbot: <code>{chatbot_answer}</code></li></ul></details>", unsafe_allow_html=True)
+                
+                # Show the three metrics
+                st.markdown("### 📊 Metrics")
+                st.markdown(f"**✅ Context Precision:** {context_precision:.3f}")
+                st.markdown(f"**✅ Answer Correctness:** {answer_correctness:.3f}")
+                st.markdown(f"**✅ BERTScore F1:** {bertscore_f1:.3f}")
                 
                 # Detailed metric calculations
                 st.markdown("### 📊 Metric Calculations")
@@ -643,41 +582,34 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                     status = "✅ Relevant" if sim_chunk > SIMILARITY_THRESHOLD else "❌ Not Relevant"
                     st.markdown(f"- Chunk {i+1}: '{chunk[:60]}{'...' if len(chunk) > 60 else ''}' → Similarity: {sim_chunk:.3f} → {status}")
                 
-                st.markdown(f"**Standard Context Precision:** {context_precision:.3f}")
-                st.markdown(f"**Context Recall:** {context_recall:.3f}")
-                st.markdown(f"**Context F1:** {context_f1:.3f}")
-                st.markdown(f"**Response Relevancy:** {response_relevancy_score:.3f}")
         except Exception as e:
             st.error(f"Error for question '{question}': {e}")
             if wandb_initialized:
                 wandb.log({"error": f"{question}: {e}"})
         progress.progress((idx + 1) / len(ground_truth))
-    accuracy = hits / len(ground_truth)
-    avg_bleu = sum(bleu_scores) / len(bleu_scores) if bleu_scores else 0.0
-    avg_rouge_l = sum(rouge_l_scores) / len(rouge_l_scores) if rouge_l_scores else 0.0
-    context_precisions = [r["context_precision"] for r in results]
-    context_recalls = [r["context_recall"] for r in results]
-    context_f1s = [r["context_f1"] for r in results]
-    similarities = [r["similarity"] for r in results]
+    
+    # Calculate final metrics
     avg_context_precision = sum(context_precisions) / len(context_precisions) if context_precisions else 0.0
-    avg_context_recall = sum(context_recalls) / len(context_recalls) if context_recalls else 0.0
-    avg_context_f1 = sum(context_f1s) / len(context_f1s) if context_f1s else 0.0
-    avg_answer_correctness = sum(similarities) / len(similarities) if similarities else 0.0
-    avg_response_relevancy = sum(response_relevancies) / len(response_relevancies) if response_relevancies else 0.0
-    st.success(f"🤖 **Chatbot Evaluation Complete!** Final Accuracy: {accuracy:.1%} ({hits}/{len(ground_truth)} questions answered correctly)")
+    avg_answer_correctness = sum(answer_correctness_scores) / len(answer_correctness_scores) if answer_correctness_scores else 0.0
+    avg_bertscore_f1 = sum(bertscore_f1_scores) / len(bertscore_f1_scores) if bertscore_f1_scores else 0.0
+    
+    st.success(f"🤖 **Chatbot Evaluation Complete!**")
+    
+    # Display only the three specified metrics
     metrics = {
-        "Accuracy": f"{accuracy:.1%}",
-        "Avg Context Precision": f"{avg_context_precision:.3f}",
-        "Avg Answer Correctness Score": f"{avg_answer_correctness:.3f}",
-        "Total Questions": f"{len(ground_truth)}",
-        "Hits": f"{hits}"
+        "✅ Context Precision": f"{avg_context_precision:.3f}",
+        "✅ Answer Correctness": f"{avg_answer_correctness:.3f}",
+        "✅ BERTScore F1": f"{avg_bertscore_f1:.3f}",
+        "Total Questions": f"{len(ground_truth)}"
     }
     st.table(pd.DataFrame(metrics.items(), columns=['Metric', 'Value']))
+    
     if wandb_initialized:
         wandb.log({
-            "accuracy": accuracy,
-            "total_questions": len(ground_truth),
-            "hits": hits
+            "avg_context_precision": avg_context_precision,
+            "avg_answer_correctness": avg_answer_correctness,
+            "avg_bertscore_f1": avg_bertscore_f1,
+            "total_questions": len(ground_truth)
         })
         wandb.finish()
     st.info("📊 **Results logged to wandb** - Check your dashboard for detailed analytics and charts.")
