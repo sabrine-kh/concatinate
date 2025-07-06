@@ -62,11 +62,6 @@ ground_truth = [
     "question": "What is the 'HV Qualified' attribute used for?",
     "answer": "The 'HV Qualified' attribute defines if a part is approved for high voltage application, which is specified as a range greater than 60 V. The attribute is set to 'Yes' ONLY when the documentation indicates this property, or the parts are used in an HV-connector or an HV-assembly. Otherwise, it is 'No'."
   },
-
-  {
-    "question": "What value should be entered for numeric attributes if a value is definitely not available?",
-    "answer": "For numeric attributes where a value is definitely not available (because it makes no sense, can't be clarified, or doesn't exist), the value '999' should be used. This indicates the attribute has been checked and a correct value is unavailable."
-  },
   
   {
     "question": "What is the 'Capillar-Stop-Function' in a wire?",
