@@ -63,10 +63,7 @@ ground_truth = [
     "question": "What is the 'HV Qualified' attribute used for?",
     "answer": "The 'HV Qualified' attribute defines if a part is approved for high voltage application, which is specified as a range greater than 60 V. The attribute is set to 'Yes' ONLY when the documentation indicates this property, or the parts are used in an HV-connector or an HV-assembly. Otherwise, it is 'No'."
   },
-  {
-    "question": "What rule applies to the 'Max. Working Temperature [°C]' attribute if the 3000-hour temperature is unavailable?",
-    "answer": "If the temperature for 3000 hours isn't available in the part's documentation, the temperature of the next bigger time term (e.g., 30000 hours) should be used. If there isn't a time term with defined hours and only the information 'permanent temperature' is available, then this temperature can be used."
-  },
+
   {
     "question": "What value should be entered for numeric attributes if a value is definitely not available?",
     "answer": "For numeric attributes where a value is definitely not available (because it makes no sense, can't be clarified, or doesn't exist), the value '999' should be used. This indicates the attribute has been checked and a correct value is unavailable."
@@ -193,10 +190,7 @@ ground_truth = [
     "question": "How is the 'Number Of Cavities' determined for a connector with numbered cavities?",
     "answer": "The 'Number of Cavities' is the highest number shown on the housing itself, regardless of how many cavities might be closed or blocked, but only if the cavities have numerations."
   },
-  {
-    "question": "When is the 'Number Of Rows' for a connector set to 0?",
-    "answer": "The 'Number of Rows' is set to 0 if the connector does not have straight rows, if the cavity sizes are different (e.g., a mix of tab size 1.5 and 2.8), or for 1-cavity connectors."
-  },
+
   {
     "question": "What does 'Pre-Assembled = Yes' mean for a connector?",
     "answer": "This attribute defines if the connector is delivered as an assembly (e.g., with a TPA, CPA, or lever) which has to be disassembled in our production in order to be used."
@@ -241,10 +235,7 @@ ground_truth = [
     "question": "What is the purpose of a 'Cap or cover'?",
     "answer": "A cap or cover is used to protect a connector, other parts like battery lugs or eyelets, or a wire connection spot against environmental conditions."
   },
-  {
-    "question": "How do you differentiate between a Cap and a Cover for a connector?",
-    "answer": "A Cap is assembled on the interface (mating) side of a connector to protect the terminals inside. A Cover is used on the wire side of a connector to protect the wires where they enter the housing."
-  },
+
   {
     "question": "What are the rules for the 'Strip Length [mm]' attribute for electric contacts?",
     "answer": "- Use the value specified on the supplier drawing.\n- If only max and min are given, enter their average (e.g. (3.75 + 4.25)/2 = 4.00 mm).\n- If only max or min is given, use that value.\n- If no supplier data exists, calculate an approximate value: ≤ 1 mm² → S = X + 1 mm; 1-16 mm² → S = X + 2 mm; > 16 mm² → S = X + 3 mm, where X is the crimp width."
@@ -365,11 +356,6 @@ ground_truth = [
     "question": "What is the purpose of a 'Bush'?",
     "answer": "A bush is a mechanical component, often a hollow cylinder or sleeve, that can be used for various purposes like providing a bearing surface, spacing, or as a support sleeve for shielding contacts in connectors."
   },
-
-  {
-    "question": "How is a 'Tie lead-through + Edge' clip attached?",
-    "answer": "This type of clip is designed to be attached to the edge of a sheet metal panel or plastic part."
-  },
   {
     "question": "What is a 'Tie lead-through + Arrowhead' clip?",
     "answer": "This is a clip that combines a guide for a tie (lead-through) with an arrowhead-style fastener that pushes into a hole to secure it."
@@ -428,10 +414,7 @@ ground_truth = [
     "question": "How is the 'Insulation Thickness [mm]' of a heat-shrink sleeve with adhesive defined?",
     "answer": "For a heat-shrink sleeve with an adhesive liner, the insulation thickness is the total value of the jacket thickness after heating plus the adhesive liner thickness."
   },
-  {
-    "question": "What are the main types of 'Production support tool'?",
-    "answer": "The main types are: Extraction tool (for unlocking TPA, etc.), Safety knife, Installation Aid, and Mixing tube (for fluid materials)."
-  },
+ 
   {
     "question": "What are the types of 'Adhesive' based on adhesion method?",
     "answer": "The types are: fast setting adhesive, hot melt adhesive, and two component adhesive."
@@ -709,17 +692,3 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
         wandb.finish()
     st.info("📊 **Results logged to wandb** - Check your dashboard for detailed analytics and charts.")
 
-with st.sidebar:
-    st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
-    if st.button("🏠 Home", key="home_btn"):
-        st.switch_page("app.py")
-    if st.button("💬 Chat with Leoparts", key="chat_btn"):
-        st.switch_page("pages/chatbot.py")
-    if st.button("📄 Extract a new Part", key="extract_btn"):
-        st.switch_page("pages/extraction_attributs.py")
-    if st.button("🆕 New conversation", key="new_conv_btn"):
-        st.session_state.messages = []
-        st.session_state.last_part_number = None
-        st.rerun()
-    if st.button("📊 Evaluate Doc Search", key="eval_btn"):
-        st.switch_page("pages/evaluate_doc_search.py")
