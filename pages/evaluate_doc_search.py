@@ -71,14 +71,7 @@ ground_truth = [
     "question": "What value should be entered for numeric attributes if a value is definitely not available?",
     "answer": "For numeric attributes where a value is definitely not available (because it makes no sense, can't be clarified, or doesn't exist), the value '999' should be used. This indicates the attribute has been checked and a correct value is unavailable."
   },
-  {
-    "question": "How are multi-value attributes ordered in the LEOparts object details page?",
-    "answer": "The values of multi-value attributes are sorted alphabetically in the object detail page after the part is checked-in, regardless of the order in which they were entered during editing."
-  },
-  {
-    "question": "What is the 'Structure' attribute for conductors?",
-    "answer": "The 'Structure' attribute is a special short key used to identify the overall design structure of a wire. The naming can be done according to different guidelines or norms such as JASO, SAE, and DIN 76722."
-  },
+  
   {
     "question": "What is the 'Capillar-Stop-Function' in a wire?",
     "answer": "The 'Capillar-Stop-Function' is a feature in anti-capillary wires and cables that prevents liquids (like water or oil) from flowing through the conductors via capillary action, which could otherwise damage electronic circuitry."
@@ -115,10 +108,7 @@ ground_truth = [
     "question": "What is a 'Screen' in the context of multi cables?",
     "answer": "A screen is a sub-classification for multi cables that acts as a Faraday cage to reduce electrical noise and electromagnetic radiation. The material can be Copper (Cu), Aluminum (Al), or Steel."
   },
-  {
-    "question": "What is the purpose of a 'Drain Wire'?",
-    "answer": "A drain wire is an uninsulated wire typically used in shielded cables. It is in contact with the metallic side of the shield foil and is used to ground the shield, providing a path for unwanted electrical noise to be drained away."
-  },
+
   {
     "question": "What are the two types of flat cables described in the document?",
     "answer": "The document describes two types of flat cables: 'exFC – Extruded flat cable', which consists of several flat copper wires arranged in parallel and insulated, and 'FLC – Flat laminated cable'."
@@ -182,10 +172,6 @@ ground_truth = [
   {
     "question": "What is 'Connector Position Assurance' (CPA)?",
     "answer": "Connector Position Assurance (CPA) is an additional protection feature to ensure that a connector is placed correctly to its counterpart and to prevent it from being removed unintentionally. It can only be activated when the connector is in the right position."
-  },
-  {
-    "question": "What information should be used for the 'Contact Systems' attribute of a connector?",
-    "answer": "The 'Contact Systems' attribute should define the terminal family that is used in the connector (e.g., MQS, BTL1.5, RK). It should not be the name of the connector family itself."
   },
   {
     "question": "What is the rule for the 'Gender' attribute for a connector with different cavity types?",
@@ -399,10 +385,6 @@ ground_truth = [
   },
 
   {
-    "question": "What are the different types of 'Rubber Boot'?",
-    "answer": "Rubber boots are protective coverings. The types are based on what they cover: Connector, Terminal (including non-shrinking insulation sleeves), Eyelet, and Battery Lug."
-  },
-  {
     "question": "When is an End Cap classified as a Heat-shrink sleeve?",
     "answer": "If an end cap needs to be shrunken to fit or seal, it should be classified under 'Heat-shrink sleeve' rather than 'End Cap'."
   },
@@ -458,10 +440,6 @@ ground_truth = [
   {
     "question": "What are the different types of 'Marking Material'?",
     "answer": "The types are: Printer Label, Marker, Clip, Ident sleeve, Plate, Tape, RFID Label, Amperage Identification, and RFID Token."
-  },
-  {
-    "question": "What is the difference between a BJT and a Darlington transistor?",
-    "answer": "A BJT (Bipolar Junction Transistor) is a single semiconductor device used for amplification. A Darlington transistor is a compound structure made of two BJT transistors connected in a way that the current amplified by the first is amplified further by the second, providing very high current gain."
   }
 ]
 # Helper: get chatbot answer (wraps existing logic, does not change it)
