@@ -567,13 +567,13 @@ def run_chatbot():
                 # Add conditional instruction for table vs. plain text
                 if relevant_attribute_rows:
                     extra_instruction = (
-                        "If the context is a table of attributes, present your answer as a table.\n"
-                        "Do not add any comments or explanations about where the data comes from. Only present the answer and the table.\n"
+                        "Present your answer as a clear, concise sentence, followed by the table if relevant. "
+                        "Do not add any meta-comments or explanations about where the data comes from.\n"
                     )
                 else:
                     extra_instruction = (
-                        "If the context is from documentation, answer in plain text, not as a table.\n"
-                        "Do not add any comments or explanations about where the data comes from. Only present the answer.\n"
+                        "Present your answer as a clear, concise sentence. "
+                        "Do not add any meta-comments or explanations about where the data comes from.\n"
                     )
                 prompt_for_llm = f"""Context:
 {combined_context}
