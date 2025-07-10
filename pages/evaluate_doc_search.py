@@ -21,8 +21,6 @@ from sentence_transformers import SentenceTransformer, util
 from supabase import create_client
 import pandas as pd
 import re
-# Add BERTScore import
-from bert_score import score as bert_score
 from sklearn.metrics.pairwise import cosine_similarity
 
 # --- Ground truth ---
@@ -475,7 +473,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     # Metrics setup - only the three specified metrics
     context_precisions = []
     answer_correctness_scores = []
-    bertscore_f1_scores = []
+    answer_relevancy_scores = []
     SIMILARITY_THRESHOLD = 0.4  # Use a variable for easy adjustment
     
     for idx, item in enumerate(ground_truth):
@@ -490,14 +488,11 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
             answer_correctness = util.pytorch_cos_sim(emb_gt, emb_cb).item()
             answer_correctness_scores.append(answer_correctness)
             
-            # 2. BERTScore F1
-            try:
-                P, R, F1 = bert_score([chatbot_answer], [expected_answer], lang='en', verbose=False)
-                bertscore_f1 = F1[0].item()
-            except Exception as e:
-                st.warning(f"BERTScore calculation failed for question {idx+1}: {e}")
-                bertscore_f1 = 0.0
-            bertscore_f1_scores.append(bertscore_f1)
+            # 2. Answer Relevancy (using cosine similarity between question and answer)
+            emb_question = model.encode(question, convert_to_tensor=True)
+            emb_answer = model.encode(chatbot_answer, convert_to_tensor=True)
+            answer_relevancy = util.pytorch_cos_sim(emb_question, emb_answer).item()
+            answer_relevancy_scores.append(answer_relevancy)
             
             # 3. Context Precision: compare chatbot answer to ground truth in chunks
             all_sentences = [s.strip() for s in re.split(r'[.!?]', chatbot_answer) if s.strip()]
@@ -525,7 +520,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 "chatbot_answer": chatbot_answer,
                 "answer_correctness": answer_correctness,
                 "context_precision": context_precision,
-                "bertscore_f1": bertscore_f1,
+                "answer_relevancy": answer_relevancy,
                 "num_supabase_chunks": num_supabase_chunks,
                 "num_answer_chunks": len(answer_chunks),
             })
@@ -537,7 +532,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                     "chatbot_answer": chatbot_answer,
                     "answer_correctness": answer_correctness,
                     "context_precision": context_precision,
-                    "bertscore_f1": bertscore_f1,
+                    "answer_relevancy": answer_relevancy,
                     "num_supabase_chunks": num_supabase_chunks,
                     "num_answer_chunks": len(answer_chunks),
                 })
@@ -551,7 +546,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
                 st.markdown("### 📊 Metrics")
                 st.markdown(f"**✅ Context Precision:** {context_precision:.3f}")
                 st.markdown(f"**✅ Answer Correctness:** {answer_correctness:.3f}")
-                st.markdown(f"**✅ BERTScore F1:** {bertscore_f1:.3f}")
+                st.markdown(f"**✅ Answer Relevancy:** {answer_relevancy:.3f}")
                 
                 # Detailed metric calculations
                 st.markdown("### 📊 Metric Calculations")
@@ -591,7 +586,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     # Calculate final metrics
     avg_context_precision = sum(context_precisions) / len(context_precisions) if context_precisions else 0.0
     avg_answer_correctness = sum(answer_correctness_scores) / len(answer_correctness_scores) if answer_correctness_scores else 0.0
-    avg_bertscore_f1 = sum(bertscore_f1_scores) / len(bertscore_f1_scores) if bertscore_f1_scores else 0.0
+    avg_answer_relevancy = sum(answer_relevancy_scores) / len(answer_relevancy_scores) if answer_relevancy_scores else 0.0
     
     st.success(f"🤖 **Chatbot Evaluation Complete!**")
     
@@ -599,7 +594,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
     metrics = {
         "✅ Context Precision": f"{avg_context_precision:.3f}",
         "✅ Answer Correctness": f"{avg_answer_correctness:.3f}",
-        "✅ BERTScore F1": f"{avg_bertscore_f1:.3f}",
+        "✅ Answer Relevancy": f"{avg_answer_relevancy:.3f}",
         "Total Questions": f"{len(ground_truth)}"
     }
     st.table(pd.DataFrame(metrics.items(), columns=['Metric', 'Value']))
@@ -608,7 +603,7 @@ if st.button("Run Chatbot vs Ground Truth Evaluation"):
         wandb.log({
             "avg_context_precision": avg_context_precision,
             "avg_answer_correctness": avg_answer_correctness,
-            "avg_bertscore_f1": avg_bertscore_f1,
+            "avg_answer_relevancy": avg_answer_relevancy,
             "total_questions": len(ground_truth)
         })
         wandb.finish()

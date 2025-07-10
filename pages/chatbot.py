@@ -115,16 +115,15 @@ except Exception as e:
 
 # --- Model & DB Config ---
 MARKDOWN_TABLE_NAME = "markdown_chunks"
-ATTRIBUTE_TABLE_NAME = "Leoni_attributes"          # <<< VERIFY
-RPC_FUNCTION_NAME = "match_markdown_chunks"     # <<< VERIFY
+ATTRIBUTE_TABLE_NAME = "Leoni_attributes"          
+RPC_FUNCTION_NAME = "match_markdown_chunks"     
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBEDDING_DIMENSIONS = 384
 
 # ░░░  MODEL SWITCH  ░░░
-GROQ_MODEL_FOR_SQL = "qwen-qwq-32b"              ### <-- CHANGED
-GROQ_MODEL_FOR_ANSWER = "qwen-qwq-32b"              ### <-- CHANGED
-# st.write(f"Using Groq Model for SQL: {GROQ_MODEL_FOR_SQL}")
-# st.write(f"Using Groq Model for Answer: {GROQ_MODEL_FOR_ANSWER}")
+GROQ_MODEL_FOR_SQL = "qwen-qwq-32b"              
+GROQ_MODEL_FOR_ANSWER = "qwen-qwq-32b"             
+
 
 # --- Search Parameters ---
 VECTOR_SIMILARITY_THRESHOLD = 0.4
@@ -140,7 +139,6 @@ except Exception as e:
 
 try:
     st_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    # st.success(f"Sentence Transformer model ({EMBEDDING_MODEL_NAME}) loaded.")
     test_emb = st_model.encode("test")
     if len(test_emb) != EMBEDDING_DIMENSIONS:
         raise ValueError("Embedding dimension mismatch")
@@ -150,7 +148,6 @@ except Exception as e:
 
 try:
     groq_client = Groq(api_key=GROQ_API_KEY)
-    # st.success("Groq client initialized.")
 except Exception as e:
     st.error(f"Error initializing Groq client: {e}")
     st.stop()
