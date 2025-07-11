@@ -485,7 +485,7 @@ llm = ChatGroq(
     temperature=0.0,
     groq_api_key=GROQ_API_KEY,
     model_name=GROQ_MODEL_FOR_SQL,  # Use your Qwen model
-    max_tokens=2048,
+    max_tokens=8069,
     
 )
 
