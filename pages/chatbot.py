@@ -9,16 +9,16 @@ import re
 from io import StringIO
 import contextlib
 from supabase import create_client, Client
-from sentence_transformers import SentenceTransformer
-from groq import Groq
+# from sentence_transformers import SentenceTransformer
 import logging
 import sys
+import requests
 
 # --- LangChain imports for agent-based routing ---
 from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType
 from langchain_groq import ChatGroq
-
+from groq import Groq
 # Initialize Streamlit
 st.set_page_config(
     page_title="LEOparts Chatbot",
@@ -107,7 +107,8 @@ try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_SERVICE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-    if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY, GROQ_API_KEY]):
+    HF_TOKEN = st.secrets["HF_TOKEN"]
+    if not all([SUPABASE_URL, SUPABASE_SERVICE_KEY, GROQ_API_KEY, HF_TOKEN]):
         raise ValueError("One or more secrets not found.")
 except Exception as e:
     st.error(f"Error loading secrets: {e}")
@@ -116,9 +117,9 @@ except Exception as e:
 # --- Model & DB Config ---
 MARKDOWN_TABLE_NAME = "markdown_chunks"
 ATTRIBUTE_TABLE_NAME = "Leoni_attributes"          
-RPC_FUNCTION_NAME = "match_markdown_chunks"     
-EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-EMBEDDING_DIMENSIONS = 384
+RPC_FUNCTION_NAME = "match_markdown_chunks_1024"     
+EMBEDDING_MODEL_NAME = "baai/bge-m3"  # Updated model name
+EMBEDDING_DIMENSIONS = 1024  # Updated dimension for bge-m3
 
 # ░░░  MODEL SWITCH  ░░░
 GROQ_MODEL_FOR_SQL = "qwen-qwq-32b"              
@@ -137,14 +138,45 @@ except Exception as e:
     st.error(f"Error initializing Supabase client: {e}")
     st.stop()
 
-try:
-    st_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    test_emb = st_model.encode("test")
-    if len(test_emb) != EMBEDDING_DIMENSIONS:
-        raise ValueError("Embedding dimension mismatch")
-except Exception as e:
-    st.error(f"Error loading Sentence Transformer model: {e}")
-    st.stop()
+# Remove local SentenceTransformer loading
+# from sentence_transformers import SentenceTransformer
+# st_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+# test_emb = st_model.encode("test")
+# if len(test_emb) != EMBEDDING_DIMENSIONS:
+#     raise ValueError("Embedding dimension mismatch")
+
+HF_API_URL = "https://hbaananou-embedder-model.hf.space/embed"  # Updated to custom endpoint
+HF_TOKEN = st.secrets["HF_TOKEN"]
+
+def get_query_embedding(text):
+    if not text:
+        return None
+    try:
+        headers = {
+            "Authorization": f"Bearer {HF_TOKEN}"
+        }
+        payload = {
+            "texts": [text]
+        }
+        print("Payload:", payload)
+        response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=30)
+        print("Status code:", response.status_code)
+        print("Response text:", response.text)
+        response.raise_for_status()
+        result = response.json()
+        # Use the correct key for your API
+        if "vectors" in result:
+            embedding = result["vectors"][0]
+        elif "embedding" in result:
+            embedding = result["embedding"]
+        elif "embeddings" in result:
+            embedding = result["embeddings"][0]
+        else:
+            raise ValueError("No embedding found in API response")
+        return embedding
+    except Exception as e:
+        st.error(f"    Error generating query embedding via Hugging Face API: {e}")
+        return None
 
 try:
     groq_client = Groq(api_key=GROQ_API_KEY)
@@ -170,15 +202,6 @@ def strip_think_tags(text: str) -> str:
 # ───────────────────────────────────────────────────────────────────────────
 # Existing helper functions
 # ───────────────────────────────────────────────────────────────────────────
-def get_query_embedding(text):
-    if not text:
-        return None
-    try:
-        return st_model.encode(text).tolist()
-    except Exception as e:
-        st.error(f"    Error generating query embedding: {e}")
-        return None
-
 def find_relevant_attributes_with_sql(generated_sql: str):
     """
     Executes the LLM-generated SELECT via execute_readonly_sql().
@@ -460,13 +483,10 @@ def extract_part_number(text):
 # --- Initialize LangChain LLM (Qwen via Groq) ---
 llm = ChatGroq(
     temperature=0.0,
-    top_p=1.0,
     groq_api_key=GROQ_API_KEY,
     model_name=GROQ_MODEL_FOR_SQL,  # Use your Qwen model
     max_tokens=2048,
-    frequency_penalty=0.0,
-    presence_penalty=0.0,
-    seed=42
+    
 )
 
 # Configure logging to stdout
