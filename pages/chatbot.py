@@ -283,7 +283,10 @@ User Question: "Any grey parts?"
 SQL Query: SELECT "Number", "Colour", "Name" FROM "Leoni_attributes" WHERE "Colour" ILIKE '%grey%' OR "Colour" ILIKE '%gray%' OR "Colour" ILIKE '%gry%' OR "Colour" ILIKE '%gy%' OR "Colour" ILIKE '%GRY%' OR "Colour" ILIKE '%graey%' OR "Name" ILIKE '%grey%' OR "Name" ILIKE '%gray%' OR "Name" ILIKE '%gry%' OR "Name" ILIKE '%gy%' OR "Name" ILIKE '%GRY%' OR "Name" ILIKE '%graey%' LIMIT 10; # Example with alternative spelling, typo
 
 User Question: "Parts with more than 10 cavities"
-SQL Query: SELECT "Number", "Number Of Cavities" FROM "Leoni_attributes" WHERE "Number Of Cavities" > 10 LIMIT 10;
+SQL Query: SELECT "Number", "Number Of Cavities" FROM "Leoni_attributes" WHERE "Number Of Cavities" IS NOT NULL AND TRIM("Number Of Cavities") != '' AND "Number Of Cavities" ~ '^[0-9]+$' AND CAST("Number Of Cavities" AS INTEGER) > 10 LIMIT 10;
+
+User Question: "give me 3 parts above 10 cavities"
+SQL Query: SELECT "Number", "Number Of Cavities" FROM "Leoni_attributes" WHERE "Number Of Cavities" IS NOT NULL AND TRIM("Number Of Cavities") != '' AND "Number Of Cavities" ~ '^[0-9]+$' AND CAST("Number Of Cavities" AS INTEGER) > 10 LIMIT 3;
 
 User Question: "What is a TPA?"
 SQL Query: NO_SQL
