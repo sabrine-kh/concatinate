@@ -122,8 +122,8 @@ EMBEDDING_MODEL_NAME = "baai/bge-m3"  # Updated model name
 EMBEDDING_DIMENSIONS = 1024  # Updated dimension for bge-m3
 
 # ░░░  MODEL SWITCH  ░░░
-GROQ_MODEL_FOR_SQL = "qwen-qwq-32b"              
-GROQ_MODEL_FOR_ANSWER = "qwen-qwq-32b"             
+GROQ_MODEL_FOR_SQL = "qwen/qwen3-32b"              
+GROQ_MODEL_FOR_ANSWER = "qwen/qwen3-32b"             
 
 
 # --- Search Parameters ---
@@ -301,7 +301,7 @@ SQL Query:
             ],
             model=GROQ_MODEL_FOR_SQL,
             temperature=0.1,
-            max_tokens=131072
+            max_tokens=40960
         )
         if not response.choices or not response.choices[0].message:
             return None
