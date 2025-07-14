@@ -238,65 +238,57 @@ def generate_sql_from_query(user_query, table_schema):
 
 Strictly adhere to the following rules:
 1. **Output Only SQL or NO_SQL**: Your entire response must be either a single, valid PostgreSQL SELECT statement ending with a semicolon (;) OR the exact word NO_SQL if the question cannot be answered by querying the table. Do not add explanations or markdown formatting.
+
 2. **Target Table**: ONLY query the "Leoni_attributes" table.
+
 3. **Column Quoting**: Use double quotes around column names ONLY if necessary (contain spaces, capitals beyond first letter, special chars). Check schema: {table_schema}
+
 4. **SELECT Clause**:
-   - Select columns explicitly asked for or implied by the user's condition.
-   - Always include the columns involved in the WHERE clause conditions for verification.
-   - Use `SELECT *` for requests about a specific part number.
-   - Always include the "Sourcing Status" column in the SELECT clause if the user asks about approval, sourcing, or status, or if the question may be followed by such a request.
+   - If the user asks for specific attributes (e.g., Colour, Mechanical Coding), include only those columns and the "Number" column.
+   - If the user does not specify any particular attribute, include key informative columns like "Number", "Name", "Material Name", and "Sourcing Status".
+   - Use `SELECT *` only when the user explicitly asks for "all data", "full info", or says "everything" about a part.
+   - Always include columns referenced in the WHERE clause.
+
 5. **Robust Keyword Searching (CRITICAL RULE)**:
-   - Identify the main descriptive keyword(s) in the user's question (e.g., colors, materials, types like 'black', 'connector', 'grey', 'terminal'). Do NOT apply this robust search to specific identifiers like part numbers unless the user query implies a pattern search (e.g., 'starts with...').
-   - For the identified keyword(s), generate a comprehensive list of **potential variations**:
-     - **Common Abbreviations:** (e.g., 'blk', 'bk' for black; 'gry', 'gy' for grey; 'conn' for connector; 'term' for terminal).
-     - **Alternative Spellings/Regional Variations:** (e.g., 'grey'/'gray', 'colour'/'color').
-     - **Different Casings:** (e.g., 'BLK', 'Gry', 'CONN').
-     - ***Likely Typos/Common Misspellings:*** (e.g., for 'black', consider 'blak', 'blck'; for 'terminal', consider 'termnial', 'terminl'; for 'connector', 'conecter'). Use your knowledge of common typing errors, but be reasonable – don't include highly improbable variations.
-   - Search for the original keyword AND **ALL generated variations** across **multiple relevant text-based attributes**. Relevant attributes typically include "Colour", "Name", "Material Name", "Context", "Type Of Connector", "Terminal Position Assurance", etc. – use context to decide which columns are most relevant for the specific keyword.
-   - Use `ILIKE` with surrounding wildcards (`%`) (e.g., `'%variation%'`) for case-insensitive, substring matching for every term and variation.
-   - Combine **ALL** these individual search conditions (original + all variations across all relevant columns) using the `OR` operator. This might result in a long WHERE clause, which is expected.
-6. **LIMIT Clause**: Use `LIMIT 3` for specific part number lookups. Use `LIMIT 10` (or maybe `LIMIT 20` if many variations are generated) for broader keyword searches to provide a reasonable sample.
+   - Identify the main descriptive keyword(s) in the user's question (e.g., colors, materials, types like 'black', 'connector', 'grey', 'terminal').
+   - Do NOT apply this robust search to part numbers unless it's a pattern like "starts with".
+   - For each keyword, generate:
+     - **Common Abbreviations**
+     - **Alternative Spellings/Regional Variations**
+     - **Different Casings**
+     - **Likely Typos**
+   - Search for these terms across relevant columns using `ILIKE` with `%` wildcards.
+   - Combine all conditions using OR.
+
+6. **LIMIT Clause**:
+   - Use `LIMIT 3` for specific part number lookups.
+   - Use `LIMIT 10` or `LIMIT 20` for broad queries.
+
 7. **YEAR FILTERS**:
-   - If the user's question contains any standalone four-digit number between 1900 and 2100, treat that token as a creation-year.
-   - In that case, add  
-       `EXTRACT(YEAR FROM "Created On") = <that year>`  
-     to your WHERE clause automatically (alongside any other filters).
-8. **NO_SQL**: Return NO_SQL for general knowledge questions, requests outside the table's scope, or highly ambiguous queries.
+   - If the user query contains a four-digit number between 1900–2100, filter on `EXTRACT(YEAR FROM "Created On") = <year>`.
+
+8. **NO_SQL**:
+   - Return `NO_SQL` for general definitions, non-database questions, or ambiguous queries.
 
 Table Schema: "Leoni_attributes"
 {table_schema}
 
 Examples:
+
 User Question: "What is part number P00001636?"
+SQL Query: SELECT "Number", "Name", "Sourcing Status" FROM "Leoni_attributes" WHERE "Number" = 'P00001636' LIMIT 3;
+
+User Question: "Give me all data about part P00001636"
 SQL Query: SELECT * FROM "Leoni_attributes" WHERE "Number" = 'P00001636' LIMIT 3;
 
-User Question: "Show me supplier parts containing 'connector'"
-SQL Query: SELECT "Number", "Name", "Object Type Indicator", "Type Of Connector" FROM "Leoni_attributes" WHERE "Object Type Indicator" = 'Supplier Part' AND ("Name" ILIKE '%connector%' OR "Name" ILIKE '%conn%' OR "Name" ILIKE '%conecter%' OR "Type Of Connector" ILIKE '%connector%' OR "Type Of Connector" ILIKE '%conn%' OR "Type Of Connector" ILIKE '%conecter%') LIMIT 10; # Includes variation and likely typo
+User Question: "What is the Colour of part P00108815?"
+SQL Query: SELECT "Number", "Colour" FROM "Leoni_attributes" WHERE "Number" = 'P00108815' LIMIT 3;
 
-User Question: "Find part numbers starting with C"
-SQL Query: SELECT "Number", "Name" FROM "Leoni_attributes" WHERE "Number" ILIKE 'C%' LIMIT 10; # Pattern search, not robust keyword search
+User Question: "Show me parts containing connector"
+SQL Query: SELECT "Number", "Name", "Type Of Connector" FROM "Leoni_attributes" WHERE "Name" ILIKE '%connector%' OR "Name" ILIKE '%conn%' OR "Type Of Connector" ILIKE '%connector%' OR "Type Of Connector" ILIKE '%conn%' LIMIT 10;
 
-User Question: "List part numbers that are black"
-SQL Query: SELECT "Number", "Colour", "Name", "Material Name" FROM "Leoni_attributes" WHERE "Colour" ILIKE '%black%' OR "Colour" ILIKE '%blk%' OR "Colour" ILIKE '%bk%' OR "Colour" ILIKE '%BLK%' OR "Colour" ILIKE '%blak%' OR "Colour" ILIKE '%blck%' OR "Name" ILIKE '%black%' OR "Name" ILIKE '%blk%' OR "Name" ILIKE '%bk%' OR "Name" ILIKE '%BLK%' OR "Name" ILIKE '%blak%' OR "Name" ILIKE '%blck%' OR "Material Name" ILIKE '%black%' OR "Material Name" ILIKE '%blk%' OR "Material Name" ILIKE '%bk%' OR "Material Name" ILIKE '%BLK%' OR "Material Name" ILIKE '%blak%' OR "Material Name" ILIKE '%blck%' LIMIT 10; # Example with typos added
-
-User Question: "Any grey parts?"
-SQL Query: SELECT "Number", "Colour", "Name" FROM "Leoni_attributes" WHERE "Colour" ILIKE '%grey%' OR "Colour" ILIKE '%gray%' OR "Colour" ILIKE '%gry%' OR "Colour" ILIKE '%gy%' OR "Colour" ILIKE '%GRY%' OR "Colour" ILIKE '%graey%' OR "Name" ILIKE '%grey%' OR "Name" ILIKE '%gray%' OR "Name" ILIKE '%gry%' OR "Name" ILIKE '%gy%' OR "Name" ILIKE '%GRY%' OR "Name" ILIKE '%graey%' LIMIT 10; # Example with alternative spelling, typo
-
-User Question: "Parts with more than 10 cavities"
-SQL Query: SELECT "Number", "Number Of Cavities" FROM "Leoni_attributes" WHERE "Number Of Cavities" IS NOT NULL AND TRIM("Number Of Cavities") != '' AND "Number Of Cavities" ~ '^[0-9]+$' AND CAST("Number Of Cavities" AS INTEGER) > 10 LIMIT 10;
-
-User Question: "give me 3 parts above 10 cavities"
-SQL Query: SELECT "Number", "Number Of Cavities" FROM "Leoni_attributes" WHERE "Number Of Cavities" IS NOT NULL AND TRIM("Number Of Cavities") != '' AND "Number Of Cavities" ~ '^[0-9]+$' AND CAST("Number Of Cavities" AS INTEGER) > 10 LIMIT 3;
-
-User Question: "What is a TPA?"
-SQL Query: NO_SQL
-
-User Question: "Which parts date back to 2017?"
-SQL Query:
-SELECT "Number", "Created On"
-FROM "Leoni_attributes"
-WHERE EXTRACT(YEAR FROM "Created On") = 2017
-LIMIT 10;
+User Question: "Which parts are grey"
+SQL Query: SELECT "Number", "Colour", "Name" FROM "Leoni_attributes" WHERE "Colour" ILIKE '%grey%' OR "Colour" ILIKE '%gry%' OR "Name" ILIKE '%grey%' OR "Name" ILIKE '%gry%' LIMIT 10;
 
 User Question: "{user_query}"
 SQL Query:
