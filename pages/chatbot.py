@@ -389,10 +389,12 @@ def format_context(attribute_rows):
 # ───────────────────────────────────────────────────────────────────────────
 def get_groq_chat_response(prompt, context_provided=True):
     if context_provided:
-        system_message = ("You are a helpful assistant knowledgeable about LEOparts standards and attributes. "
-                          "Answer the user's question based *only* on the provided context from the Standards Document and/or the Attributes Table. "
-                          "The Attributes Table context shows rows retrieved based on the user's query; assume these rows accurately reflect the query's conditions as interpreted by the client-side filters. "
-                          "Synthesize information from both sources if relevant and available. Be concise. If listing items, like part numbers, list them clearly.")
+        system_message = (
+            "You are a helpful assistant knowledgeable about LEOparts standards and attributes. "
+            "When answering questions using database attributes, always start with a short, clear sentence summarizing the key answer. "
+            "Then, present the relevant data as a markdown table with column headers matching the database columns. "
+            "Do not add any extra explanations or formatting."
+        )
     else:
         system_message = ("You are a helpful assistant knowledgeable about LEOparts standards and attributes. "
                           "You were unable to find relevant information in the knowledge base (documents or attributes) to answer the user's question. "
