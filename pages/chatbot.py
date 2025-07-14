@@ -373,15 +373,18 @@ def format_context(attribute_rows):
         row = attribute_rows[0]
         table = "| Attribute | Value |\n|---|---|\n"
         for key, value in row.items():
-            if value is not None:
-                table += f"| {key} | {json.dumps(value)} |\n"
+            display_value = "None" if value is None or value == "" else json.dumps(value)
+            table += f"| {key} | {display_value} |\n"
         return table
     # If multiple rows, show as a horizontal table
     headers = list(attribute_rows[0].keys())
     table = "| " + " | ".join(headers) + " |\n"
     table += "| " + " | ".join("---" for _ in headers) + " |\n"
     for row in attribute_rows:
-        table += "| " + " | ".join(json.dumps(row.get(h, "")) for h in headers) + " |\n"
+        table += "| " + " | ".join(
+            "None" if row.get(h, None) is None or row.get(h, "") == "" else json.dumps(row.get(h, ""))
+            for h in headers
+        ) + " |\n"
     return table
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -597,6 +600,10 @@ def run_chatbot():
                         "Present your answer as a clear, concise sentence. "
                         "Do not add any meta-comments or explanations about where the data comes from.\n"
                     )
+                extra_instruction += (
+    "If an attribute value is None, null, or empty, display it as None (not as 'Not provided' or any other phrase). "
+    "Do not paraphrase or summarize missing values. Always use the exact value as shown in the table.\n"
+)
                 prompt_for_llm = f"""Context:
 {combined_context}
 
