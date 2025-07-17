@@ -290,6 +290,9 @@ SQL Query: SELECT "Number", "Name", "Type Of Connector" FROM "Leoni_attributes" 
 User Question: "Which parts are grey"
 SQL Query: SELECT "Number", "Colour", "Name" FROM "Leoni_attributes" WHERE "Colour" ILIKE '%grey%' OR "Colour" ILIKE '%gry%' OR "Name" ILIKE '%grey%' OR "Name" ILIKE '%gry%' LIMIT 10;
 
+User Question: "Is this part number P00739119 is GF?"
+SQL Query: SELECT "Number", "Material Filling" FROM "Leoni_attributes" WHERE "Number" = 'P00739119' AND "Material Filling" ILIKE '%GF%' LIMIT 3;
+
 User Question: "{user_query}"
 SQL Query:
 """
