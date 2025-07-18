@@ -270,6 +270,12 @@ Strictly adhere to the following rules:
 8. **NO_SQL**:
    - Return `NO_SQL` for general definitions, non-database questions, or ambiguous queries.
 
+9. **Ambiguous or Unclear Questions**:
+   - If you are unsure which columns to select, or if the user's question is ambiguous, use SELECT * to return all columns for the matching rows.
+
+10. **No Specific Column Mentioned**:
+    - If the user question does not mention a specific column name or attribute, use SELECT * to return all columns for the matching rows.
+
 Table Schema: "Leoni_attributes"
 {table_schema}
 
