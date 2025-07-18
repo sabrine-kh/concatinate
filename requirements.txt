@@ -32,6 +32,6 @@ groq>=0.4.0
 nest_asyncio>=1.5.8
 wandb
 
-# Evaluation metrics
-bert-score
+numind # Add NuMind SDK for structured extraction
+
 
