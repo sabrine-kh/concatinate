@@ -65,7 +65,7 @@ def tag_chunk_with_dictionary(chunk_text, attribute_regexes):
     for attr, regex in attribute_regexes.items():
         matches = regex.findall(chunk_text)
         # Convert matches to a list and handle empty lists properly for Chroma metadata
-        match_list = list({m.strip() for m in matches})
+        match_list = sorted({m.strip() for m in matches})
         if match_list:
             # If we have matches, store them as a comma-separated string
             tags[attr] = ", ".join(match_list)
@@ -297,11 +297,13 @@ async def process_uploaded_pdfs(uploaded_files: List[BinaryIO], temp_dir: str = 
             results = await asyncio.gather(*tasks)
             logger.info("All PDF processing tasks completed")
             
-            # Combine all results
+            # Combine all results in a deterministic order (by file name)
+            results = [docs for docs in results if docs]
+            results.sort(key=lambda docs: docs[0].metadata['source'] if docs and hasattr(docs[0], 'metadata') and 'source' in docs[0].metadata else '')
+            all_docs = []
             for docs in results:
-                if docs:  # Check if docs is not None
-                    all_docs.extend(docs)
-                    logger.debug(f"Added {len(docs)} documents from a processed file")
+                all_docs.extend(docs)
+                logger.debug(f"Added {len(docs)} documents from a processed file")
             
     except Exception as e:
         logger.error(f"Error during batch PDF processing: {str(e)}", exc_info=True)
@@ -338,6 +340,8 @@ def fetch_chunks(retriever, part_number, attr_key, k=8):
     
     # Get initial dense results
     dense_results = retriever.get_relevant_documents(attr_key)[:k]
+    # Sort by source and page for deterministic order
+    dense_results = sorted(dense_results, key=lambda c: (c.metadata.get('source', ''), c.metadata.get('page', 0)))
     logger.debug(f"Retrieved {len(dense_results)} initial chunks for attribute '{attr_key}'")
     
     # Special debugging for Contact Systems
@@ -383,6 +387,9 @@ def fetch_chunks(retriever, part_number, attr_key, k=8):
         logger.warning(f"No chunks found with '{attr_key}' tag. Falling back to semantic similarity retrieval.")
         filtered = dense_results[:k]  # Take the top k semantically similar chunks
         logger.info(f"Fallback: Using {len(filtered)} semantically similar chunks for '{attr_key}'")
+
+    # Sort filtered results for deterministic order
+    filtered = sorted(filtered, key=lambda c: (c.metadata.get('source', ''), c.metadata.get('page', 0)))
     
     logger.info(f"Final result: {len(filtered)} chunks for attribute '{attr_key}' and part number '{part_number}'")
     return filtered

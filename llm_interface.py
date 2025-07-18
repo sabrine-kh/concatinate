@@ -18,6 +18,47 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from bs4 import BeautifulSoup # Import BeautifulSoup
 
+import hashlib
+import datetime
+import os
+import json
+
+RETRIEVED_CHUNKS_LOG = os.path.join(os.path.dirname(__file__), 'retrieved_chunks_log.jsonl')
+
+# Load attribute dictionary
+def load_attribute_dictionary():
+    """Load the attribute dictionary from JSON file."""
+    try:
+        dict_path = os.path.join(os.path.dirname(__file__), 'attribute_dictionary.json')
+        with open(dict_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load attribute dictionary: {e}")
+        return {}
+
+# Global attribute dictionary
+ATTRIBUTE_DICT = load_attribute_dictionary()
+
+def _hash_chunk(chunk):
+    # Hash chunk content and metadata for reproducibility
+    m = hashlib.sha256()
+    m.update(chunk.page_content.encode('utf-8'))
+    m.update(json.dumps(chunk.metadata, sort_keys=True).encode('utf-8'))
+    return m.hexdigest()
+
+def _log_retrieved_chunks(attribute_key, query, chunks):
+    # Store a record of retrieved chunks for this attribute and query
+    record = {
+        'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+        'attribute_key': attribute_key,
+        'query': query,
+        'chunk_hashes': [_hash_chunk(chunk) for chunk in chunks],
+        'chunk_metadata': [chunk.metadata for chunk in chunks],
+        'num_chunks': len(chunks)
+    }
+    with open(RETRIEVED_CHUNKS_LOG, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(record) + '\n')
+
 # --- Initialize LLM ---
 @logger.catch(reraise=True) # Keep catch for unexpected errors during init
 def initialize_llm():
@@ -59,20 +100,109 @@ def format_docs(docs: List[Document]) -> str:
         )
     return "\n\n---\n\n".join(context_parts)
 
+def create_enhanced_search_queries(attribute_key: str, base_query: str) -> list:
+    """Create enhanced search queries using dictionary values and synonyms."""
+    queries = [base_query]  # Always include the original query
+    
+    # Get dictionary values for this attribute
+    dict_values = ATTRIBUTE_DICT.get(attribute_key, [])
+    
+    # Create attribute-specific search terms
+    attribute_terms = {
+        "Material Filling": ["filling", "additive", "filler", "glass fiber", "GF", "GB", "MF", "talcum"],
+        "Material Name": ["material", "polymer", "PA", "PBT", "PP", "PET", "PC", "silicone", "rubber"],
+        "Pull-To-Seat": ["pull to seat", "pull-back", "tug-lock", "terminal insertion", "seating"],
+        "Gender": ["gender", "male", "female", "plug", "receptacle", "socket", "header"],
+        "Height [MM]": ["height", "Y-axis", "total height", "thickness"],
+        "Length [MM]": ["length", "Z-axis", "depth", "insertion depth"],
+        "Width [MM]": ["width", "X-axis", "diameter"],
+        "Number Of Cavities": ["cavity", "position", "way", "pin count", "terminal count"],
+        "Number Of Rows": ["row", "grid", "arrangement", "layout"],
+        "Mechanical Coding": ["coding", "keying", "polarization", "mechanical key"],
+        "Colour": ["color", "colour", "black", "white", "red", "blue", "yellow"],
+        "Colour Coding": ["color coding", "colour coding", "coded components"],
+        "Working Temperature": ["temperature", "thermal", "operating temp", "min temp", "max temp"],
+        "Housing Seal": ["seal", "sealing", "radial seal", "interface seal", "ring seal"],
+        "Wire Seal": ["wire seal", "individual seal", "mat seal", "gel seal"],
+        "Sealing": ["sealing", "waterproof", "dustproof", "IP rating"],
+        "Sealing Class": ["IP", "ingress protection", "IPx0", "IPx4", "IPx6", "IPx7"],
+        "Contact Systems": ["contact system", "terminal system", "MQS", "MCP", "TAB", "MLK"],
+        "Terminal Position Assurance": ["TPA", "terminal position assurance", "anti-backout"],
+        "Connector Position Assurance": ["CPA", "connector position assurance", "secondary lock"],
+        "Name Of Closed Cavities": ["closed cavity", "blocked position", "plugged cavity"],
+        "Pre-assembled": ["pre-assembled", "assembly", "disassembly", "delivered as"],
+        "Type Of Connector": ["connector type", "standard", "antenna", "relay holder", "bulb holder"],
+        "Set/Kit": ["set", "kit", "accessories", "components"],
+        "HV Qualified": ["HV", "high voltage", "voltage", "qualified", "certified"]
+    }
+    
+    # Add attribute-specific terms
+    if attribute_key in attribute_terms:
+        queries.extend(attribute_terms[attribute_key])
+    
+    # Add dictionary values as search terms (for better matching)
+    for value in dict_values[:10]:  # Limit to first 10 values to avoid too many queries
+        if isinstance(value, str) and len(value) > 1:
+            queries.append(value)
+    
+    # Create combined queries using base query + dictionary values
+    if dict_values:
+        for value in dict_values[:5]:  # Use top 5 dictionary values
+            if isinstance(value, str) and len(value) > 1:
+                combined_query = f"{base_query} {value}"
+                queries.append(combined_query)
+    
+    # Remove duplicates and limit total queries
+    unique_queries = list(dict.fromkeys(queries))[:20]  # Increased to 20 queries
+    
+    return unique_queries
+
 def retrieve_and_log_chunks(retriever, query: str, attribute_key: str):
-    """Retrieves chunks from the retriever and logs them for debugging."""
-    logger.info(f"🔍 RETRIEVING CHUNKS for attribute '{attribute_key}' with query: '{query}'")
+    """Retrieves chunks from the retriever using enhanced search queries and logs them for debugging."""
+    logger.info(f"🔍 RETRIEVING CHUNKS for attribute '{attribute_key}' with base query: '{query}'")
+    
+    # Create enhanced search queries
+    enhanced_queries = create_enhanced_search_queries(attribute_key, query)
+    logger.info(f"📋 Using {len(enhanced_queries)} enhanced search queries: {enhanced_queries[:5]}...")
+    
+    all_chunks = []
+    seen_chunks = set()  # Track unique chunks by content hash
     
     try:
-        chunks = retriever.invoke(query)
+        # Try each enhanced query
+        for i, search_query in enumerate(enhanced_queries):
+            logger.debug(f"🔍 Search {i+1}/{len(enhanced_queries)}: '{search_query}'")
+            
+            try:
+                chunks = retriever.invoke(search_query)
+                
+                if chunks:
+                    # Add unique chunks only
+                    for chunk in chunks:
+                        chunk_hash = _hash_chunk(chunk)
+                        if chunk_hash not in seen_chunks:
+                            seen_chunks.add(chunk_hash)
+                            all_chunks.append(chunk)
+                            logger.debug(f"  ✅ Added unique chunk from query '{search_query}'")
+                
+            except Exception as e:
+                logger.warning(f"❌ Query '{search_query}' failed: {e}")
+                continue
         
-        if not chunks:
-            logger.warning(f"❌ No chunks retrieved for attribute '{attribute_key}'")
+        # Limit total chunks to avoid overwhelming the LLM
+        max_chunks = 10
+        if len(all_chunks) > max_chunks:
+            logger.info(f"📊 Limiting chunks from {len(all_chunks)} to {max_chunks}")
+            all_chunks = all_chunks[:max_chunks]
+        
+        if not all_chunks:
+            logger.warning(f"❌ No chunks retrieved for attribute '{attribute_key}' after trying {len(enhanced_queries)} queries")
+            _log_retrieved_chunks(attribute_key, query, [])
             return []
         
-        logger.info(f"✅ Retrieved {len(chunks)} chunks for attribute '{attribute_key}':")
+        logger.info(f"✅ Retrieved {len(all_chunks)} unique chunks for attribute '{attribute_key}' from {len(enhanced_queries)} queries:")
         
-        for i, chunk in enumerate(chunks):
+        for i, chunk in enumerate(all_chunks):
             source = chunk.metadata.get('source', 'Unknown')
             page = chunk.metadata.get('page', 'N/A')
             start_index = chunk.metadata.get('start_index', 'N/A')
@@ -80,10 +210,13 @@ def retrieve_and_log_chunks(retriever, query: str, attribute_key: str):
             logger.info(f"  📄 Chunk {i+1}: Source='{source}', Page={page}, StartIndex={start_index}")
             logger.info(f"     Content: {chunk.page_content[:200]}{'...' if len(chunk.page_content) > 200 else ''}")
         
-        return chunks
+        _log_retrieved_chunks(attribute_key, query, all_chunks)
+        
+        return all_chunks
         
     except Exception as e:
-        logger.error(f"❌ Error retrieving chunks for attribute '{attribute_key}': {e}")
+        logger.error(f"❌ Error in enhanced retrieval for attribute '{attribute_key}': {e}")
+        _log_retrieved_chunks(attribute_key, query, [])
         return []
 
 @logger.catch(reraise=True)
@@ -457,32 +590,34 @@ Part Number Information (if provided by user):
 Extraction Instructions:
 {extraction_instructions}
 
+Available Dictionary Values for "{attribute_key}":
+{available_values}
+
 ---
-IMPORTANT: Respond with ONLY a single, valid JSON object containing exactly one key-value pair.
-- The key for the JSON object MUST be the string: "{attribute_key}"
-- The value MUST be the extracted result determined by following the Extraction Instructions using the Document Context provided above.
-- Provide the value as a JSON string. Examples: "GF, T", "none", "NOT FOUND", "Female", "7.2", "999".
-- Do NOT include any explanations, reasoning, or any text outside of the single JSON object in your response.
+IMPORTANT: For the attribute key "{attribute_key}", do the following:
+1. Look for information in the Document Context that matches the Extraction Instructions
+2. Find the BEST MATCH from the Available Dictionary Values above
+3. If no match is found in the dictionary, use "NOT FOUND" or appropriate default value
+4. Respond with ONLY a single, valid JSON object containing exactly one key-value pair:
+   - The key MUST be the string: "{attribute_key}"
+   - The value MUST be one of the available dictionary values or "NOT FOUND"
+5. Do NOT include any explanations, intermediate answers, reasoning, or any text outside of the single JSON object in your response.
 
 Example Output Format:
-{{"{attribute_key}": "extracted_value_from_pdf"}}
+{{"{attribute_key}": "best_match_from_dictionary"}}
 
 Output:
 """
     prompt = PromptTemplate.from_template(template)
 
-    # Chain uses retriever to get PDF context
+    # Chain uses retriever to get PDF context based on extraction instructions
     pdf_chain = (
         RunnableParallel(
-            context=RunnablePassthrough() | (lambda x: retrieve_and_log_chunks(retriever, f"Extract information about {x['attribute_key']} for part number {x.get('part_number', 'N/A')}", x['attribute_key'])) | format_docs,
-            extraction_instructions=RunnablePassthrough(),
-            attribute_key=RunnablePassthrough(),
-            part_number=RunnablePassthrough()
-        )
-        .assign(
-            extraction_instructions=lambda x: x['extraction_instructions']['extraction_instructions'],
-            attribute_key=lambda x: x['attribute_key']['attribute_key'],
-            part_number=lambda x: x['part_number'].get('part_number', "Not Provided")
+            context=lambda x: format_docs(retrieve_and_log_chunks(retriever, x['extraction_instructions'], x['attribute_key'])),
+            extraction_instructions=lambda x: x['extraction_instructions'],
+            attribute_key=lambda x: x['attribute_key'],
+            part_number=lambda x: x.get('part_number', "Not Provided"),
+            available_values=lambda x: str(ATTRIBUTE_DICT.get(x['attribute_key'], []))
         )
         | prompt
         | llm
@@ -513,13 +648,14 @@ Extraction Instructions:
 {extraction_instructions}
 
 ---
-IMPORTANT: Follow the Extraction Instructions carefully using the website data.
-Respond with ONLY a single, valid JSON object containing exactly one key-value pair.
-- The key for the JSON object MUST be the string: "{attribute_key}"
-- The value MUST be the result obtained by applying the Extraction Instructions to the Cleaned Scraped Website Data.
-- Provide the value as a JSON string.
-- If the information cannot be determined from the Cleaned Scraped Website Data based on the instructions, the value MUST be "NOT FOUND".
-- Do NOT include any explanations or reasoning outside the JSON object.
+IMPORTANT: For the attribute key "{attribute_key}", do the following:
+1. Independently answer the extraction task THREE times, as if reasoning from scratch each time, using only the provided Cleaned Scraped Website Data and Extraction Instructions.
+2. Internally compare your three answers and select the one that is most consistent or most frequent among them. If all three answers are different, choose the one you believe is most justified by the context and instructions.
+3. Respond with ONLY a single, valid JSON object containing exactly one key-value pair:
+   - The key MUST be the string: "{attribute_key}"
+   - The value MUST be the final answer you selected (as a JSON string).
+   - If the information cannot be determined from the Cleaned Scraped Website Data based on the instructions, the value MUST be "NOT FOUND".
+4. Do NOT include any explanations, intermediate answers, reasoning, or any text outside the JSON object.
 
 Example Output Format:
 {{"{attribute_key}": "extracted_value_based_on_instructions"}}
@@ -528,17 +664,12 @@ Output:
 """
     prompt = PromptTemplate.from_template(template)
 
-    # Chain structure similar to PDF chain to handle inputs
+    # Chain structure simplified to handle inputs directly
     web_chain = (
         RunnableParallel(
-            cleaned_web_data=RunnablePassthrough(),
-            extraction_instructions=RunnablePassthrough(),
-            attribute_key=RunnablePassthrough()
-        )
-        .assign(
-            cleaned_web_data=lambda x: x['cleaned_web_data']['cleaned_web_data'], # Nested dict access
-            extraction_instructions=lambda x: x['extraction_instructions']['extraction_instructions'],
-            attribute_key=lambda x: x['attribute_key']['attribute_key']
+            cleaned_web_data=lambda x: x['cleaned_web_data'],
+            extraction_instructions=lambda x: x['extraction_instructions'],
+            attribute_key=lambda x: x['attribute_key']
         )
         | prompt
         | llm
@@ -547,6 +678,306 @@ Output:
     logger.info("Web Data Extraction chain created successfully (accepts instructions).")
     return web_chain
 
+
+# --- NuMind Integration for Structured Extraction ---
+import os
+from typing import Dict, Any, Optional
+
+# NuMind configuration
+NUMIND_API_KEY = os.getenv("NUMIND_API_KEY", "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJkVWRIUGZnUlk3NzBiMHNvZlRFUWlWU2MyMW9kRENRbmcxZE5ZZjR2b1dBIn0.eyJleHAiOjE3ODM2MjA5NTksImlhdCI6MTc1MjA5MDU0MiwiYXV0aF90aW1lIjoxNzUyMDg0OTU5LCJqdGkiOiJiNzIzYzc1MS00MWUyLTRmNTMtODYzMC1kNjU3NzE1YzMxMGEiLCJpc3MiOiJodHRwczovL3VzZXJzLm51bWluZC5haS9yZWFsbXMvZXh0cmFjdC1wbGF0Zm9ybSIsImF1ZCI6WyJhY2NvdW50IiwiYXBpIl0sInN1YiI6IjNlOTEyNTlhLWVkZGEtNDc0YS04ZWZhLWZlOWMzYzg2NjcxOSIsInR5cCI6IkJlYXJlciIsImF6cCI6InVzZXIiLCJzaWQiOiIwOTA3NDE5ZC1lM2Y1LTRlOTctOWMxZi00ZmVlMGE4M2Q5MjUiLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbIi8qIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIiwiZGVmYXVsdC1yb2xlcy1leHRyYWN0LXBsYXRmb3JtIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJvcmdhbml6YXRpb25zIjp7fSwibmFtZSI6IkhhbWRpIEJhYW5hbm91IiwiY2xpZW50IjoiYXBpIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiYmFhbmFub3Vjb250YWN0QGdtYWlsLmNvbSIsImdpdmVuX25hbWUiOiJIYW1kaSIsImZhbWlseV9uYW1lIjoiQmFhbmFub3UiLCJlbWFpbCI6ImJhYW5hbm91Y29udGFjdEBnbWFpbC5jb20ifQ.DSAc5gkuzR8Kip40QFA32pVRYfmn7dzCNHcEZUIryI5n1z2U5m5gQ70qRH4brwgwuzEiUnn3TgJ0gALAbjNRU1V4K-KICPBny_eNmm2UhQBEUHqUqyjPbIjYZD6K4-gcBbdMoZzSNpFaSmYfZBK1xt4QDmXrKkLhumm8cJ5P_sphtRpYHhQ6CmAorfRQ4Bzg2jaYc20Pu4-Vqn2uxtGEG_KOW2wkwUPcDfGY0cx1H5oTFk7P4o1u6w8tzvMcjgf510cTgyk0rtYnPY8UguORuoY35D0cCTygWUhXZSHkEOSsSEs8MlR6wXn5EQ_4Ht1ZM5vjFRfWOdJO4zP0pd6Yxw")
+NUMIND_PROJECT_ID = os.getenv("NUMIND_PROJECT_ID", "dab6080e-5409-43b0-8f02-7a844ba933d5")
+
+def create_numind_extraction_chain():
+    """
+    Creates a NuMind extraction chain for structured data extraction.
+    Returns the NuMind client if properly configured, None otherwise.
+    """
+    try:
+        from numind import NuMind
+        
+        if not NUMIND_API_KEY or not NUMIND_PROJECT_ID:
+            logger.warning("NuMind API key or project ID not configured. NuMind extraction will be disabled.")
+            return None
+            
+        client = NuMind(api_key=NUMIND_API_KEY)
+        logger.info("NuMind extraction chain created successfully.")
+        return client
+        
+    except ImportError:
+        logger.warning("NuMind SDK not installed. Install with: pip install numind")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to initialize NuMind client: {e}")
+        return None
+
+async def extract_with_numind_from_bytes(client, file_bytes: bytes, attribute_key: str) -> Optional[Dict[str, Any]]:
+    """
+    Extract specific attribute using NuMind API with file bytes.
+    Uses the extraction schema configured in the NuMind project.
+    
+    Args:
+        client: NuMind client instance
+        file_bytes: File content as bytes
+        attribute_key: The attribute key to extract
+        
+    Returns:
+        Dictionary with extraction result or None if failed
+    """
+    if not client or not file_bytes or not attribute_key:
+        logger.warning("NuMind extraction skipped: missing client, file_bytes, or attribute_key")
+        return None
+        
+    try:
+        logger.info(f"Starting NuMind extraction for attribute '{attribute_key}' from file bytes (size: {len(file_bytes)})")
+        
+        # Get the extraction schema from the project first
+        try:
+            project_info = client.get_api_projects_projectid(NUMIND_PROJECT_ID)
+            logger.info(f"Retrieved project info: {project_info}")
+        except Exception as e:
+            logger.warning(f"Could not retrieve project info: {e}")
+            project_info = None
+        
+        # Call the NuMind API with the configured extraction schema
+        # The API will use the extraction template configured in your NuMind project
+        output_schema = client.post_api_projects_projectid_extract(NUMIND_PROJECT_ID, file_bytes)
+        
+        if output_schema and hasattr(output_schema, 'model_dump'):
+            result = output_schema.model_dump()
+            logger.success(f"NuMind extraction completed for '{attribute_key}'")
+            logger.debug(f"NuMind result structure: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+            return result
+        else:
+            logger.warning(f"NuMind extraction returned invalid result for '{attribute_key}'")
+            return None
+            
+    except Exception as e:
+        logger.error(f"NuMind extraction failed for '{attribute_key}': {e}")
+        return None
+
+async def extract_with_numind_using_schema(client, file_bytes: bytes, extraction_schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Extract using NuMind API. The extraction template should be configured in the NuMind project.
+    
+    Args:
+        client: NuMind client instance
+        file_bytes: File content as bytes
+        extraction_schema: The extraction schema (for reference, but not passed to API)
+        
+    Returns:
+        Dictionary with extraction result or None if failed
+    """
+    if not client or not file_bytes:
+        logger.warning("NuMind extraction skipped: missing client or file_bytes")
+        return None
+        
+    try:
+        logger.info(f"Starting NuMind extraction from file bytes (size: {len(file_bytes)})")
+        
+        # Call the NuMind API - it uses the extraction template configured in the project
+        output_schema = client.post_api_projects_projectid_extract(
+            NUMIND_PROJECT_ID, 
+            file_bytes
+        )
+        
+        if output_schema and hasattr(output_schema, 'model_dump'):
+            result = output_schema.model_dump()
+            logger.success("NuMind extraction completed")
+            logger.debug(f"NuMind result structure: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+            return result
+        else:
+            logger.warning("NuMind extraction returned invalid result")
+            return None
+            
+    except Exception as e:
+        logger.error(f"NuMind extraction failed: {e}")
+        return None
+
+def get_default_extraction_schema() -> Dict[str, Any]:
+    """
+    Returns the default extraction schema that matches your NuMind playground configuration.
+    You should replace this with the actual schema from your NuMind project.
+    """
+    # This is a template - you need to replace this with your actual NuMind extraction schema
+    # You can get this from your NuMind playground by copying the schema configuration
+    return {
+        "type": "object",
+        "properties": {
+            "Material Filling": {
+                "type": "string",
+                "description": "The material filling or additive used in the connector"
+            },
+            "Material Name": {
+                "type": "string", 
+                "description": "The main material name of the connector"
+            },
+            "Pull-To-Seat": {
+                "type": "string",
+                "description": "Pull-to-seat force or mechanism information"
+            },
+            "Gender": {
+                "type": "string",
+                "description": "The gender of the connector (male/female)"
+            },
+            "Height [MM]": {
+                "type": "string",
+                "description": "Height of the connector in millimeters"
+            },
+            "Length [MM]": {
+                "type": "string",
+                "description": "Length of the connector in millimeters"
+            },
+            "Width [MM]": {
+                "type": "string",
+                "description": "Width of the connector in millimeters"
+            },
+            "Number Of Cavities": {
+                "type": "string",
+                "description": "Number of cavities or positions in the connector"
+            },
+            "Number Of Rows": {
+                "type": "string",
+                "description": "Number of rows in the connector"
+            },
+            "Mechanical Coding": {
+                "type": "string",
+                "description": "Mechanical coding or keying information"
+            },
+            "Colour": {
+                "type": "string",
+                "description": "Color of the connector"
+            },
+            "Colour Coding": {
+                "type": "string",
+                "description": "Color coding information"
+            },
+            "Max. Working Temperature [°C]": {
+                "type": "string",
+                "description": "Maximum working temperature in Celsius"
+            },
+            "Min. Working Temperature [°C]": {
+                "type": "string",
+                "description": "Minimum working temperature in Celsius"
+            },
+            "Housing Seal": {
+                "type": "string",
+                "description": "Housing seal information"
+            },
+            "Wire Seal": {
+                "type": "string",
+                "description": "Wire seal information"
+            },
+            "Sealing": {
+                "type": "string",
+                "description": "Sealing information"
+            },
+            "Sealing Class": {
+                "type": "string",
+                "description": "Sealing class or IP rating"
+            },
+            "Contact Systems": {
+                "type": "string",
+                "description": "Contact system type"
+            },
+            "Terminal Position Assurance": {
+                "type": "string",
+                "description": "Terminal position assurance information"
+            },
+            "Connector Position Assurance": {
+                "type": "string",
+                "description": "Connector position assurance information"
+            },
+            "Name Of Closed Cavities": {
+                "type": "string",
+                "description": "Information about closed cavities"
+            },
+            "Pre-assembled": {
+                "type": "string",
+                "description": "Pre-assembly information"
+            },
+            "Type Of Connector": {
+                "type": "string",
+                "description": "Type of connector"
+            },
+            "Set/Kit": {
+                "type": "string",
+                "description": "Set or kit information"
+            },
+            "HV Qualified": {
+                "type": "string",
+                "description": "High voltage qualification information"
+            }
+        },
+        "required": []
+    }
+
+def extract_specific_attribute_from_numind_result(numind_result: Dict[str, Any], attribute_key: str) -> Optional[str]:
+    """
+    Extract a specific attribute value from NuMind extraction result.
+    Based on the NuMind API response structure.
+    
+    Args:
+        numind_result: The result dictionary from NuMind extraction
+        attribute_key: The specific attribute key to extract
+        
+    Returns:
+        The extracted value as string, or None if not found
+    """
+    if not numind_result or not isinstance(numind_result, dict):
+        logger.warning(f"Invalid NuMind result for attribute '{attribute_key}': {type(numind_result)}")
+        return None
+        
+    try:
+        # NuMind response structure: result -> schemas -> attribute_name -> value
+        if 'result' in numind_result and 'schemas' in numind_result['result']:
+            schemas = numind_result['result']['schemas']
+            
+            if attribute_key in schemas:
+                schema_data = schemas[attribute_key]
+                
+                # Handle different schema types based on NuMind structure
+                if isinstance(schema_data, dict):
+                    # String value
+                    if 'value' in schema_data:
+                        return str(schema_data['value']).strip()
+                    # Array of values
+                    elif 'values' in schema_data and isinstance(schema_data['values'], list):
+                        # Return the first value or join multiple values
+                        values = [str(v.get('value', v)) for v in schema_data['values'] if v]
+                        return ', '.join(values) if values else None
+                    # Boolean value
+                    elif 'value' in schema_data and isinstance(schema_data['value'], bool):
+                        return str(schema_data['value'])
+                    # Number value
+                    elif 'value' in schema_data and isinstance(schema_data['value'], (int, float)):
+                        return str(schema_data['value'])
+                
+                # Direct string value
+                elif isinstance(schema_data, str):
+                    return schema_data.strip()
+                # Direct number value
+                elif isinstance(schema_data, (int, float)):
+                    return str(schema_data)
+        
+        # Fallback: try to get the value directly from the result
+        if attribute_key in numind_result:
+            value = numind_result[attribute_key]
+            if value is not None:
+                return str(value).strip()
+        
+        # If not found directly, try to find it in nested structures
+        for key, value in numind_result.items():
+            if isinstance(value, dict) and attribute_key in value:
+                nested_value = value[attribute_key]
+                if nested_value is not None:
+                    return str(nested_value).strip()
+        
+        logger.debug(f"Attribute '{attribute_key}' not found in NuMind result: {list(numind_result.keys())}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error extracting attribute '{attribute_key}' from NuMind result: {e}")
+        return None
 
 # --- Helper function to invoke chain and process response (KEEP THIS) ---
 async def _invoke_chain_and_process(chain, input_data, attribute_key):
