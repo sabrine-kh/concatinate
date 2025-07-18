@@ -397,6 +397,9 @@ def get_groq_chat_response(prompt, context_provided=True):
             "You are a helpful assistant knowledgeable about LEOparts standards and attributes. "
             "When answering questions using database attributes, always start with a short, clear sentence summarizing the key answer. "
             "Then, present the relevant data as a markdown table with column headers matching the database columns. "
+            "IMPORTANT: When the database returns part numbers (especially for date-based queries), present them clearly. "
+            "Do not say information is not available if part numbers are returned. "
+            "For date-based queries, format the response as: 'Here are the part numbers [created/modified] in [year]: [list of part numbers]' "
             "Do not add any extra explanations or formatting."
         )
     else:
