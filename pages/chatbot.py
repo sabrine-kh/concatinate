@@ -299,6 +299,9 @@ SQL Query: SELECT "Number", "Colour", "Name" FROM "Leoni_attributes" WHERE "Colo
 User Question: "Is this part number P00739119 is GF?"
 SQL Query: SELECT "Number", "Material Filling" FROM "Leoni_attributes" WHERE "Number" = 'P00739119' AND "Material Filling" ILIKE '%GF%' LIMIT 3;
 
+User Question: "Give me the list of part numbers created in 2021"
+SQL Query: SELECT "Number", "Created On" FROM "Leoni_attributes" WHERE EXTRACT(YEAR FROM "Created On") = 2021 LIMIT 20;
+
 User Question: "{user_query}"
 SQL Query:
 """
