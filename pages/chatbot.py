@@ -250,15 +250,15 @@ Strictly adhere to the following rules:
    - Always include columns referenced in the WHERE clause.
 
 5. **Robust Keyword Searching (CRITICAL RULE)**:
-   - Identify the main descriptive keyword(s) in the user's question (e.g., colors, materials, types like 'black', 'connector', 'grey', 'terminal').
-   - Do NOT apply this robust search to part numbers unless it's a pattern like "starts with".
-   - For each keyword, generate:
-     - **Common Abbreviations**
-     - **Alternative Spellings/Regional Variations**
-     - **Different Casings**
-     - **Likely Typos**
-   - Search for these terms across relevant columns using `ILIKE` with `%` wildcards.
-   - Combine all conditions using OR.
+   - Identify the main descriptive keyword(s) in the user's question (e.g., colors, materials, types like 'black', 'connector', 'grey', 'terminal'). Do NOT apply this robust search to specific identifiers like part numbers unless the user query implies a pattern search (e.g., 'starts with...').
+   - For the identified keyword(s), generate a comprehensive list of **potential variations**:
+     - **Common Abbreviations:** (e.g., 'blk', 'bk' for black; 'gry', 'gy' for grey; 'conn' for connector; 'term' for terminal).
+     - **Alternative Spellings/Regional Variations:** (e.g., 'grey'/'gray', 'colour'/'color').
+     - **Different Casings:** (e.g., 'BLK', 'Gry', 'CONN').
+     - ***Likely Typos/Common Misspellings:*** (e.g., for 'black', consider 'blak', 'blck'; for 'terminal', consider 'termnial', 'terminl'; for 'connector', 'conecter'). Use your knowledge of common typing errors, but be reasonable – don't include highly improbable variations.
+   - Search for the original keyword AND **ALL generated variations** across **multiple relevant text-based attributes**. Relevant attributes typically include "Colour", "Name", "Material Name", "Context", "Type Of Connector", "Terminal Position Assurance", etc. – use context to decide which columns are most relevant for the specific keyword.
+   - Use `ILIKE` with surrounding wildcards (`%`) (e.g., `'%variation%'`) for case-insensitive, substring matching for every term and variation.
+   - Combine **ALL** these individual search conditions (original + all variations across all relevant columns) using the `OR` operator. This might result in a long WHERE clause, which is expected.
 
 6. **LIMIT Clause**:
    - Use `LIMIT 3` for specific part number lookups.
