@@ -12,7 +12,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # --- Model Configuration ---
 # Recommend using Langchain's Groq integration if possible
 # LLM_PROVIDER = "groq" # or "requests" if using raw requests
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen-qwq-32b") # Reverted to a known good default
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen/qwen3-32b") # Reverted to a known good default
 # LLM_MODEL_NAME = "qwen-qwq-32b" # Your original choice via requests
 # GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions" # Needed if using raw requests
 
@@ -20,10 +20,18 @@ LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "qwen-qwq-32b") # Reverted to a kno
 VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "mistral-small-latest")
 
 # --- Embedding Configuration ---
-EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3")
 EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu") # Add this line ('cpu' is default, 'cuda' if GPU available and configured)
 NORMALIZE_EMBEDDINGS = True # Add this line (Often recommended for sentence transformers)
 # EMBEDDING_CACHE_DIR = os.getenv("EMBEDDING_CACHE_DIR", "./embedding_cache") # Optional: Specify cache dir
+
+# --- API Embedding Configuration ---
+USE_API_EMBEDDINGS = os.getenv("USE_API_EMBEDDINGS", "true").lower() == "true"
+EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://hbaananou-embedder-model.hf.space/embed")
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", 1024))  # Default to 1024 for BAAI/bge-m3
+EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", 5))  # Reduced default for large files
+EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", 120))  # Increased timeout for large files
+EMBEDDING_MAX_TEXT_LENGTH = int(os.getenv("EMBEDDING_MAX_TEXT_LENGTH", 4000))  # Max characters per text
 
 # --- Vector Store Configuration ---
 # Define the persistence directory (can be None for in-memory)
@@ -43,7 +51,7 @@ VECTOR_SIMILARITY_THRESHOLD = float(os.getenv("VECTOR_SIMILARITY_THRESHOLD", 0.7
 
 # --- LLM Request Configuration ---
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", 0.0)) # Adjusted default
-LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", 131072))
+LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", 8192))
 
 # --- Logging ---
 # LOG_LEVEL = "INFO" # Can be set via environment if needed
