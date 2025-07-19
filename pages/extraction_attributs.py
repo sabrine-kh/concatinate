@@ -2121,23 +2121,20 @@ else:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
 with right_col:
     st.markdown("""
-        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-                    color: white; 
-                    padding: 1rem; 
-                    border-radius: 15px; 
-                    text-align: center; 
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); \
+                    color: white; \
+                    padding: 1rem; \
+                    border-radius: 15px; \
+                    text-align: center; \
                     margin-bottom: 1rem;">
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
     
-    # Display extraction results in a beautiful format
+    # Display extraction results in a horizontal card format
     if st.session_state.evaluation_results:
-        st.markdown("""
-            <div class="extraction-results">
-        """, unsafe_allow_html=True)
-        
-        # Create a summary of extracted data
+        st.markdown('<div class="extraction-results">', unsafe_allow_html=True)
+        st.markdown('<div class="horizontal-table">', unsafe_allow_html=True)
         extracted_data = {}
         for result in st.session_state.evaluation_results:
             if isinstance(result, dict):
@@ -2145,20 +2142,16 @@ with right_col:
                 extracted_value = result.get('Extracted Value', '')
                 if extracted_value and extracted_value != 'NOT FOUND' and extracted_value != 'ERROR':
                     extracted_data[prompt_name] = extracted_value
-        
-        # Display each extracted item beautifully
         for key, value in extracted_data.items():
-            # Truncate long values for better display
             display_value = value[:100] + "..." if len(value) > 100 else value
-            st.markdown(f"""
-                <div class="result-item">
-                    <div class="result-label">🔍 {key}</div>
-                    <div class="result-value" title="{value}">{display_value}</div>
+            st.markdown(f'''
+                <div class="attribute-card">
+                    <h4>{key}</h4>
+                    <div class="attribute-value" title="{value}">{display_value}</div>
                 </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
+            ''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         # Success metrics
         if st.session_state.evaluation_metrics:
             metrics = st.session_state.evaluation_metrics
@@ -2166,7 +2159,6 @@ with right_col:
                 <div style="background: white; border-radius: 15px; padding: 1rem; margin: 1rem 0; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);">
                     <h4 style="color: #1e3c72; margin-bottom: 1rem;">📈 Success Metrics</h4>
             """, unsafe_allow_html=True)
-            
             col1, col2 = st.columns(2)
             with col1:
                 success_rate = metrics.get('success_rate', 0)
@@ -2174,7 +2166,6 @@ with right_col:
             with col2:
                 total_fields = metrics.get('total_fields', 0)
                 st.metric("Total Fields", total_fields)
-            
             st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("📄 Upload and process documents to see extracted results here.")
