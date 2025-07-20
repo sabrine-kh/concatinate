@@ -272,16 +272,14 @@ st.markdown(
     }
     .extraction-results {
         display: flex;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         gap: 1rem;
         justify-content: flex-start;
         align-items: stretch;
         margin-bottom: 1rem;
-        overflow-x: auto;
-        padding-bottom: 0.5rem;
     }
     .result-item {
-        flex: 0 0 260px;
+        flex: 1 1 calc(20% - 1rem);
         min-width: 220px;
         max-width: 260px;
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -294,6 +292,18 @@ st.markdown(
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
+    }
+    @media (max-width: 1200px) {
+        .result-item { flex-basis: calc(25% - 1rem); }
+    }
+    @media (max-width: 900px) {
+        .result-item { flex-basis: calc(33.33% - 1rem); }
+    }
+    @media (max-width: 700px) {
+        .result-item { flex-basis: calc(50% - 1rem); }
+    }
+    @media (max-width: 500px) {
+        .result-item { flex-basis: 100%; }
     }
     .result-label {
         font-weight: 600;
@@ -963,7 +973,7 @@ if st.session_state.pdf_chain and st.session_state.web_chain and not st.session_
     st.session_state.extraction_attempts = 0
     st.success("Extraction complete. Enter ground truth below.")
 
-# Display Results
+# Display Results as horizontal cards in a single row
 if st.session_state.evaluation_results:
     extracted_data = {result['Prompt Name']: result['Extracted Value'] for result in st.session_state.evaluation_results
                      if result.get('Extracted Value') and result['Extracted Value'] not in ['NOT FOUND', 'ERROR']}
@@ -973,16 +983,34 @@ if st.session_state.evaluation_results:
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="extraction-results">', unsafe_allow_html=True)
+    # Build all cards in a single HTML string for flex row
+    cards_html = '<div style="display: flex; flex-direction: row; gap: 1rem; overflow-x: auto; padding: 1rem 0; white-space: nowrap;">'
     for key, value in extracted_data.items():
         display_value = value[:100] + "..." if len(value) > 100 else value
-        st.markdown(f"""
-            <div class="result-item">
-                <div class="result-label">🔍 {key}</div>
-                <div class="result-value" title="{value}">{display_value}</div>
+        cards_html += f"""
+            <div style="
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                border: 2px solid #1e3c72;
+                border-radius: 12px;
+                padding: 1rem;
+                min-width: 220px;
+                max-width: 260px;
+                box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+                transition: all 0.3s ease;
+                display: inline-block;
+                vertical-align: top;
+                margin-right: 1rem;
+            ">
+                <div style="color: #1e3c72; margin-bottom: 0.5rem; font-size: 1.1em; font-weight: 600; border-bottom: 2px solid #1e3c72; padding-bottom: 0.5rem;">
+                    🔍 {key}
+                </div>
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 0.5rem; font-weight: 500;" title="{value}">
+                    {display_value}
+                </div>
             </div>
-        """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        """
+    cards_html += "</div>"
+    st.markdown(cards_html, unsafe_allow_html=True)
 
     if st.session_state.evaluation_metrics:
         metrics = st.session_state.evaluation_metrics
