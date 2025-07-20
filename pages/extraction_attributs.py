@@ -973,7 +973,7 @@ if st.session_state.pdf_chain and st.session_state.web_chain and not st.session_
     st.session_state.extraction_attempts = 0
     st.success("Extraction complete. Enter ground truth below.")
 
-# Display Results
+# Display Results as a single row (table)
 if st.session_state.evaluation_results:
     extracted_data = {result['Prompt Name']: result['Extracted Value'] for result in st.session_state.evaluation_results
                      if result.get('Extracted Value') and result['Extracted Value'] not in ['NOT FOUND', 'ERROR']}
@@ -983,16 +983,13 @@ if st.session_state.evaluation_results:
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="extraction-results">', unsafe_allow_html=True)
+    # Build a table row with all attributes
+    table_html = "<table style='width:100%; border-collapse:collapse;'><tr>"
     for key, value in extracted_data.items():
         display_value = value[:100] + "..." if len(value) > 100 else value
-        st.markdown(f"""
-            <div class="result-item">
-                <div class="result-label">🔍 {key}</div>
-                <div class="result-value" title="{value}">{display_value}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        table_html += f"<td style='border:1px solid #1e3c72; padding:8px; vertical-align:top;'><b>{key}</b><br>{display_value}</td>"
+    table_html += "</tr></table>"
+    st.markdown(table_html, unsafe_allow_html=True)
 
     if st.session_state.evaluation_metrics:
         metrics = st.session_state.evaluation_metrics
