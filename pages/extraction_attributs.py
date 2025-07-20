@@ -910,46 +910,66 @@ else:
         # -------------------------------------------------
 
         # --- Block 1b: Three-Stage Extraction Logic --- 
-        st.info(f"Running Stage 1 (Web Data Extraction) for {len(prompts_to_run)} attributes...")
-        
-        # Progress indicator for three-stage process
-        progress_col1, progress_col2, progress_col3 = st.columns(3)
-        with progress_col1:
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
-                            color: white; 
-                            padding: 0.5rem; 
-                            border-radius: 10px; 
-                            text-align: center; 
-                            margin-bottom: 1rem;">
-                    <strong>Stage 1: Web</strong><br>
-                    <small>Web scraping & extraction</small>
-                </div>
-            """, unsafe_allow_html=True)
-        with progress_col2:
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); 
-                            color: white; 
-                            padding: 0.5rem; 
-                            border-radius: 10px; 
-                            text-align: center; 
-                            margin-bottom: 1rem;">
-                    <strong>Stage 2: NuMind</strong><br>
-                    <small>Structured extraction</small>
-                </div>
-            """, unsafe_allow_html=True)
-        with progress_col3:
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); 
-                            color: white; 
-                            padding: 0.5rem; 
-                            border-radius: 10px; 
-                            text-align: center; 
-                            margin-bottom: 1rem;">
-                    <strong>Stage 3: Fallback</strong><br>
-                    <small>Final recheck</small>
-                </div>
-            """, unsafe_allow_html=True)
+        def render_extraction_progress(stage1_count, stage2_count, stage3_count, numind_time=None, none_responses=None):
+            st.info(f"Running Stage 1 (Web Data Extraction) for {stage1_count} attributes...")
+            progress_col1, progress_col2, progress_col3 = st.columns(3)
+            with progress_col1:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                                color: white; 
+                                padding: 0.5rem; 
+                                border-radius: 10px; 
+                                text-align: center; 
+                                margin-bottom: 1rem;">
+                        <strong>Stage 1: Web</strong><br>
+                        <small>Web scraping & extraction</small>
+                    </div>
+                """, unsafe_allow_html=True)
+            with progress_col2:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); 
+                                color: white; 
+                                padding: 0.5rem; 
+                                border-radius: 10px; 
+                                text-align: center; 
+                                margin-bottom: 1rem;">
+                        <strong>Stage 2: NuMind</strong><br>
+                        <small>Structured extraction</small>
+                    </div>
+                """, unsafe_allow_html=True)
+            with progress_col3:
+                st.markdown("""
+                    <div style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); 
+                                color: white; 
+                                padding: 0.5rem; 
+                                border-radius: 10px; 
+                                text-align: center; 
+                                margin-bottom: 1rem;">
+                        <strong>Stage 3: Fallback</strong><br>
+                        <small>Final recheck</small>
+                    </div>
+                """, unsafe_allow_html=True)
+            st.info(f"Running Stage 2 (NuMind Fallback) for {stage2_count} attributes...")
+            st.success("Using NuMind for structured extraction...")
+            if numind_time is not None:
+                st.success(f"NuMind extraction completed in {numind_time:.2f} seconds.")
+            st.info(f"Running Stage 3 (Final Fallback) for {stage3_count} attributes that need rechecking...")
+            if none_responses:
+                st.warning(f"⚠️ Including {len(none_responses)} attributes that returned 'none' responses - these will be rechecked for potential missed values.")
+
+        # After extraction logic and before showing results, call the progress UI:
+        if 'extraction_performed' in st.session_state and st.session_state.extraction_performed:
+            # Get counts and info for progress UI
+            stage1_count = len(prompts_to_run)
+            stage2_count = len([r for r in st.session_state.evaluation_results if r.get('Source') in ['NuMind', 'PDF']])
+            stage3_count = len([r for r in st.session_state.evaluation_results if r.get('Source') == 'Final Fallback'])
+            numind_time = None
+            for r in st.session_state.evaluation_results:
+                if r.get('Source') == 'NuMind' and 'Latency (s)' in r:
+                    numind_time = r['Latency (s)']
+                    break
+            none_responses = [r['Prompt Name'] for r in st.session_state.evaluation_results if r.get('Extracted Value', '').lower() in ['none', 'null', 'n/a', 'na']]
+            render_extraction_progress(stage1_count, stage2_count, stage3_count, numind_time, none_responses)
         
         cols = st.columns(2) # For displaying progress
         col_index = 0
@@ -2145,6 +2165,18 @@ with right_col:
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
+    # Call the progress UI here as well
+    if 'extraction_performed' in st.session_state and st.session_state.extraction_performed:
+        stage1_count = len(prompts_to_run)
+        stage2_count = len([r for r in st.session_state.evaluation_results if r.get('Source') in ['NuMind', 'PDF']])
+        stage3_count = len([r for r in st.session_state.evaluation_results if r.get('Source') == 'Final Fallback'])
+        numind_time = None
+        for r in st.session_state.evaluation_results:
+            if r.get('Source') == 'NuMind' and 'Latency (s)' in r:
+                numind_time = r['Latency (s)']
+                break
+        none_responses = [r['Prompt Name'] for r in st.session_state.evaluation_results if r.get('Extracted Value', '').lower() in ['none', 'null', 'n/a', 'na']]
+        render_extraction_progress(stage1_count, stage2_count, stage3_count, numind_time, none_responses)
     
     # Display extraction results in a beautiful format
     if st.session_state.evaluation_results:
