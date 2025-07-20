@@ -710,17 +710,6 @@ if st.session_state.evaluation_results:
                 extracted_data[prompt_name] = extracted_value
 
 # Use a single container for all content
-with st.container():
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-                    color: white; 
-                    padding: 1rem; 
-                    border-radius: 15px; 
-                    text-align: center; 
-                    margin-bottom: 1rem;">
-            <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
-        </div>
-    """, unsafe_allow_html=True)
     # Call the progress UI here as well
     if 'extraction_performed' in st.session_state and st.session_state.extraction_performed:
         stage1_count = len(prompts_to_run)
