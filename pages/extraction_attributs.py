@@ -30,9 +30,23 @@ import requests
 from sentence_transformers import SentenceTransformer
 import config
 
+st.set_page_config(layout="wide")
+
+st.markdown(
+    """
+    <style>
+    .main .block-container {
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 nest_asyncio.apply()
 
-# --- Extraction Progress UI Function (moved to top-level) ---
+# --- Extraction Progress UI Function ---
 def render_extraction_progress(stage1_count, stage2_count, stage3_count, numind_time=None, none_responses=None):
     st.info(f"Running Stage 1 (Web Data Extraction) for {stage1_count} attributes...")
     progress_col1, progress_col2, progress_col3 = st.columns(3)
@@ -79,9 +93,6 @@ def render_extraction_progress(stage1_count, stage2_count, stage3_count, numind_
     st.info(f"Running Stage 3 (Final Fallback) for {stage3_count} attributes that need rechecking...")
     if none_responses:
         st.warning(f"⚠️ Including {len(none_responses)} attributes that returned 'none' responses - these will be rechecked for potential missed values.")
-
-# Log initial session state
-debug_logger.info("Initial session state", data=dict(st.session_state), context={"page": "extraction_attributs"})
 
 # --- UI Setup ---
 st.markdown(
