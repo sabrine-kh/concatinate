@@ -1859,20 +1859,20 @@ else:
             **Manual Recheck allows you to re-extract specific attributes that may have been missed:**
             
             1. **Select attributes** from the dropdown below
-            2. **Click "Run Manual Recheck"** button
+            2. **Click \"Run Manual Recheck\"** button
             3. **Wait for results** - each attribute will be rechecked with enhanced prompts
             4. **Review results** - successful extractions will show green checkmarks
             
             **When to use:**
-            - Attributes that returned "NOT FOUND"
-            - Attributes that returned "none" (might be incorrect)
+            - Attributes that returned \"NOT FOUND\"
+            - Attributes that returned \"none\" (might be incorrect)
             - Attributes with errors or unexpected formats
             - Any attribute you suspect might have been missed
             
             **What happens:**
             - Uses more document chunks (15 instead of 8-12)
             - Enhanced prompts specifically for rechecking
-            - Preserves original "none" values if recheck confirms they're correct
+            - Preserves original \"none\" values if recheck confirms they're correct
             """)
         
         # Get attributes that might need manual recheck
