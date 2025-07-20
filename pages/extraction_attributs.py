@@ -64,6 +64,51 @@ st.markdown(
         opacity: 0.9;
     }
     
+    /* Stepper Bar Styling (add this HTML where you want the stepper):
+    <div class="stepper-bar">
+      <div class="stepper-step step-active">1. Web Extraction</div>
+      <div class="stepper-step">2. NuMind</div>
+      <div class="stepper-step">3. LLM Recheck</div>
+      <div class="stepper-step">4. Extraction Results</div>
+    </div>
+    */
+    .stepper-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 2rem 0 2rem 0;
+        padding: 0 0.5rem;
+        background: #f4f8fb;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(30,60,114,0.07);
+        overflow-x: auto;
+    }
+    .stepper-step {
+        flex: 1 1 0;
+        text-align: center;
+        padding: 1rem 0.5rem;
+        font-weight: 600;
+        color: #1e3c72;
+        border-bottom: 4px solid #b0c4de;
+        background: none;
+        font-size: 1.1em;
+        transition: border-color 0.3s, color 0.3s;
+    }
+    .stepper-step.step-active {
+        color: #2a5298;
+        border-bottom: 4px solid #2a5298;
+        background: linear-gradient(90deg, #e3f0fc 0%, #f8fafd 100%);
+    }
+    .stepper-step:not(:last-child)::after {
+        content: "";
+        display: inline-block;
+        width: 24px;
+        height: 2px;
+        background: #b0c4de;
+        margin: 0 8px;
+        vertical-align: middle;
+    }
+    
     /* Button styling with blue theme */
     .stButton > button {
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
@@ -110,71 +155,6 @@ st.markdown(
     .stWarning {
         background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
         border: 1px solid #1e3c72;
-    }
-    
-    /* Horizontal table styling */
-    .horizontal-table {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin: 1rem 0;
-    }
-    
-    .attribute-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border: 2px solid #1e3c72;
-        border-radius: 12px;
-        padding: 1rem;
-        min-width: 300px;
-        flex: 1;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
-        transition: all 0.3s ease;
-    }
-    
-    .attribute-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2);
-    }
-    
-    .attribute-card h4 {
-        color: #1e3c72;
-        margin: 0 0 0.5rem 0;
-        font-size: 1.1em;
-        font-weight: 600;
-        border-bottom: 2px solid #1e3c72;
-        padding-bottom: 0.5rem;
-    }
-    
-    .attribute-value {
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 0.5rem;
-        margin: 0.5rem 0;
-        font-weight: 500;
-    }
-    
-    .attribute-source {
-        font-size: 0.8em;
-        color: #6c757d;
-        font-style: italic;
-        margin-top: 0.5rem;
-    }
-    
-    .success-indicator {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        margin-right: 0.5rem;
-    }
-    
-    .success-true {
-        background-color: #28a745;
-    }
-    
-    .success-false {
-        background-color: #dc3545;
     }
     
     /* Data editor styling */
@@ -258,40 +238,43 @@ st.markdown(
         margin-right: 2rem;
     }
     
+    /* Extraction Results Styling - SIMPLE VERTICAL LIST */
     .extraction-results {
-        background: white;
-        border-radius: 15px;
-        padding: 1rem;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+        background: none;
+        border-radius: 0;
+        padding: 0.5rem 0 0.5rem 0;
+        box-shadow: none;
         margin-bottom: 1rem;
     }
-    
     .result-item {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border: 1px solid #dee2e6;
-        border-radius: 10px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        transition: all 0.3s ease;
+        background: none;
+        border: none;
+        border-bottom: 1px solid #e0e6ef;
+        border-radius: 0;
+        padding: 0.5rem 0;
+        margin: 0;
+        transition: none;
+        box-shadow: none;
+        display: block;
     }
-    
-    .result-item:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2);
+    .result-item:last-child {
+        border-bottom: none;
     }
-    
     .result-label {
         font-weight: 600;
         color: #1e3c72;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.2rem;
+        font-size: 1em;
     }
-    
     .result-value {
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 0.5rem;
+        background: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
         font-weight: 500;
+        color: #222;
+        font-size: 1em;
+        word-break: break-word;
     }
     </style>""",
     unsafe_allow_html=True
