@@ -2203,23 +2203,70 @@ else:
     # This logic might need review depending on how Stage 1/2 errors are handled
     elif (st.session_state.pdf_chain or st.session_state.web_chain) and st.session_state.extraction_performed:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
-with right_col:
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-                    color: white; 
-                    padding: 1rem; 
-                    border-radius: 15px; 
-                    text-align: center; 
-                    margin-bottom: 1rem;">
-            <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Display extraction results in a beautiful format
+
+    # --- Remove the two-column layout and right_col ---
+    # (Remove: left_col, right_col = st.columns([2, 1]) and all 'with right_col:' blocks)
+
+    # ... existing code ...
+
+    # After the extraction results are available and after the stepper/results section:
     if st.session_state.evaluation_results:
         st.markdown("""
-            <div class="extraction-results">
+            <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+                        color: white; 
+                        padding: 1rem; 
+                        border-radius: 15px; 
+                        text-align: center; 
+                        margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
+            </div>
         """, unsafe_allow_html=True)
+        
+        # Display extraction results in a beautiful horizontal flexbox format
+        st.markdown('''
+        <style>
+        .horizontal-attributes-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+            justify-content: flex-start;
+        }
+        .attribute-card-h {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 2px solid #1e3c72;
+            border-radius: 12px;
+            padding: 1rem;
+            min-width: 260px;
+            max-width: 320px;
+            flex: 1 1 260px;
+            box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+        }
+        .attribute-card-h:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2);
+        }
+        .attribute-card-h h4 {
+            color: #1e3c72;
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-bottom: 2px solid #1e3c72;
+            padding-bottom: 0.5rem;
+        }
+        .attribute-value-h {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            font-weight: 500;
+        }
+        </style>
+        <div class="horizontal-attributes-container">
+        ''', unsafe_allow_html=True)
         
         # Create a summary of extracted data
         extracted_data = {}
@@ -2230,38 +2277,17 @@ with right_col:
                 if extracted_value and extracted_value != 'NOT FOUND' and extracted_value != 'ERROR':
                     extracted_data[prompt_name] = extracted_value
         
-        # Display each extracted item beautifully
+        # Display each extracted item as a horizontal card
         for key, value in extracted_data.items():
-            # Truncate long values for better display
             display_value = value[:100] + "..." if len(value) > 100 else value
-            st.markdown(f"""
-                <div class="result-item">
-                    <div class="result-label">🔍 {key}</div>
-                    <div class="result-value" title="{value}">{display_value}</div>
+            st.markdown(f'''
+                <div class="attribute-card-h">
+                    <h4>🔍 {key}</h4>
+                    <div class="attribute-value-h" title="{value}">{display_value}</div>
                 </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Success metrics
-        if st.session_state.evaluation_metrics:
-            metrics = st.session_state.evaluation_metrics
-            st.markdown("""
-                <div style="background: white; border-radius: 15px; padding: 1rem; margin: 1rem 0; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);">
-                    <h4 style="color: #1e3c72; margin-bottom: 1rem;">📈 Success Metrics</h4>
-            """, unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                success_rate = metrics.get('success_rate', 0)
-                st.metric("Success Rate", f"{success_rate:.1%}")
-            with col2:
-                total_fields = metrics.get('total_fields', 0)
-                st.metric("Total Fields", total_fields)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        st.info("📄 Upload and process documents to see extracted results here.")
+            ''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    # ... existing code ...
     
     # Chatbot Section
     st.markdown("""
