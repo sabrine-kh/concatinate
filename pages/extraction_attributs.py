@@ -805,8 +805,20 @@ groq_client = initialize_chatbot()
 # Create two columns: left for extraction, right for results and chat
 left_col, right_col = st.columns([2, 1])
 
-with left_col:
-    st.header("2. Extracted Information")
+# Move extraction results rendering code up here
+right_col = st.container()
+with right_col:
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+                    color: white; 
+                    padding: 1rem; 
+                    border-radius: 15px; 
+                    text-align: center; 
+                    margin-bottom: 1rem;">
+            <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
+        </div>
+    """, unsafe_allow_html=True)
+    # ... rest of the extraction results/progress/cards/chat code ...
 
 # --- Get current asyncio event loop --- 
 # Needed for both scraping and running the async extraction chain
