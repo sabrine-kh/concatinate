@@ -842,15 +842,14 @@ if st.session_state.evaluation_results:
         gap: 1.5rem;
         margin: 1.5rem 0;
         justify-content: flex-start;
+        align-items: flex-start;
     }
     .attribute-card-h {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border: 2px solid #1e3c72;
         border-radius: 12px;
         padding: 1rem;
-        min-width: 260px;
-        max-width: 320px;
-        flex: 1 1 260px;
+        width: 320px;
         box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
         transition: all 0.3s ease;
         margin-bottom: 1rem;
@@ -968,15 +967,14 @@ if (st.session_state.pdf_chain or st.session_state.web_chain) and st.session_sta
             gap: 1.5rem;
             margin: 1.5rem 0;
             justify-content: flex-start;
+            align-items: flex-start;
         }
         .attribute-card-h {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border: 2px solid #1e3c72;
             border-radius: 12px;
             padding: 1rem;
-            min-width: 260px;
-            max-width: 320px;
-            flex: 1 1 260px;
+            width: 320px;
             box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
             transition: all 0.3s ease;
             margin-bottom: 1rem;
