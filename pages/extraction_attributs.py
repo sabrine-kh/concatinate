@@ -983,13 +983,11 @@ if st.session_state.evaluation_results:
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
-    # Horizontal scrollable flex row of cards
-    st.markdown('''
-        <div style="display: flex; flex-direction: row; gap: 1rem; overflow-x: auto; padding: 1rem 0;">
-    ''', unsafe_allow_html=True)
+    # Build all cards in a single HTML string for flex row
+    cards_html = '<div style="display: flex; flex-direction: row; gap: 1rem; overflow-x: auto; padding: 1rem 0;">'
     for key, value in extracted_data.items():
         display_value = value[:100] + "..." if len(value) > 100 else value
-        st.markdown(f"""
+        cards_html += f"""
             <div style="
                 background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
                 border: 2px solid #1e3c72;
@@ -1011,8 +1009,9 @@ if st.session_state.evaluation_results:
                     {display_value}
                 </div>
             </div>
-        """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        """
+    cards_html += "</div>"
+    st.markdown(cards_html, unsafe_allow_html=True)
 
     if st.session_state.evaluation_metrics:
         metrics = st.session_state.evaluation_metrics
