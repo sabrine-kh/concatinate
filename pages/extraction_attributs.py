@@ -1847,8 +1847,7 @@ else:
         st.divider()
         st.header("3. Enter Ground Truth & Evaluate")
 
-        # Removed the editable table as requested
-        st.info("Enter the correct 'Ground Truth' value for each field below. Leave blank if the field shouldn't exist or 'NOT FOUND' is correct.")
+        # Info message removed as requested
 
         # --- Mini Debug Widget ---
         from debug_interface import create_mini_debug_widget
