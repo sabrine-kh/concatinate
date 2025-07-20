@@ -638,20 +638,20 @@ if 'stepper_stage' not in st.session_state:
 
 st.markdown("""
 <style>
-.stepper { display: flex; justify-content: center; margin: 2rem 0; }
-.step { display: flex; align-items: center; }
-.step-icon {
+.stepper {{ display: flex; justify-content: center; margin: 2rem 0; }}
+.step {{ display: flex; align-items: center; }}
+.step-icon {{
     width: 36px; height: 36px; border-radius: 50%; background: #e0e0e0;
     color: #1e3c72; display: flex; align-items: center; justify-content: center;
     font-weight: bold; font-size: 1.2em; border: 2px solid #1e3c72;
     transition: background 0.3s, color 0.3s;
-}
-.step-icon.active { background: #1e3c72; color: #fff; }
-.step-icon.done { background: #28a745; color: #fff; border-color: #28a745; }
-.step-label { margin: 0 1rem; font-weight: 500; color: #1e3c72; }
-.step-connector {
+}}
+.step-icon.active {{ background: #1e3c72; color: #fff; }}
+.step-icon.done {{ background: #28a745; color: #fff; border-color: #28a745; }}
+.step-label {{ margin: 0 1rem; font-weight: 500; color: #1e3c72; }}
+.step-connector {{
     width: 40px; height: 2px; background: #1e3c72; margin: 0 0.5rem;
-}
+}}
 </style>
 <div class="stepper">
     <div class="step">
