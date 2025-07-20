@@ -710,6 +710,7 @@ if st.session_state.evaluation_results:
                 extracted_data[prompt_name] = extracted_value
 
 # Use a single container for all content
+
     # Call the progress UI here as well
     if 'extraction_performed' in st.session_state and st.session_state.extraction_performed:
         stage1_count = len(prompts_to_run)
