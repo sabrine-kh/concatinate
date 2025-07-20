@@ -2203,6 +2203,19 @@ else:
     elif (st.session_state.pdf_chain or st.session_state.web_chain) and st.session_state.extraction_performed:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
 
+# Prepare extracted_data for conditional display
+extracted_data = {}
+if st.session_state.evaluation_results:
+    for result in st.session_state.evaluation_results:
+        if isinstance(result, dict):
+            prompt_name = result.get('Prompt Name', 'Unknown')
+            extracted_value = result.get('Extracted Value', '')
+            if extracted_value and extracted_value != 'NOT FOUND' and extracted_value != 'ERROR':
+                extracted_data[prompt_name] = extracted_value
+
+# Use a single container for all content
+right_col = st.container()
+
 with right_col:
     st.markdown("""
         <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
@@ -2214,6 +2227,8 @@ with right_col:
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
+    # ... rest of the right_col content ...
+    
     # Call the progress UI here as well
     if 'extraction_performed' in st.session_state and st.session_state.extraction_performed:
         stage1_count = len(prompts_to_run)
