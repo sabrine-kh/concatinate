@@ -724,8 +724,8 @@ with st.sidebar:
         key="pdf_uploader"
     )
 
-    # --- Add Part Number Input ---
-    st.text_input("Enter Part Number (Optional):", key="part_number_input", value=st.session_state.get("part_number_input", ""))
+    # --- Remove duplicate Part Number Input from sidebar ---
+    # st.text_input("Enter Part Number (Optional):", key="part_number_input", value=st.session_state.get("part_number_input", ""))
     # ---------------------------
 
     process_button = st.button("Process Uploaded Documents", key="process_button", type="primary")
