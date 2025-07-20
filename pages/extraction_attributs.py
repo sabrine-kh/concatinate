@@ -216,7 +216,7 @@ Please provide a helpful and accurate response based on the extracted data. If t
         logger.error(f"Chatbot error: {e}")
         return f"Sorry, I encountered an error while processing your request. Please try again."
 
-# --- Navigation Sidebar ---
+# --- Navigation Sidebar (Navigation Only) ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Navigation</h2>", unsafe_allow_html=True)
     if st.button("🏠 Home"):
@@ -502,6 +502,26 @@ st.markdown("Upload your PDF documents and automatically extract key attributes.
 if not config.GROQ_API_KEY:
     st.warning("Groq API Key not found. Please set the GROQ_API_KEY environment variable.", icon="⚠️")
 
+# --- Stepper UI (replace old stepper/summary UI) ---
+st.markdown("""
+    <div class="stepper">
+        <div class="step">
+            <div class="step-icon done">1</div>
+            <div class="step-label">Web</div>
+            <div class="step-connector"></div>
+        </div>
+        <div class="step">
+            <div class="step-icon done">2</div>
+            <div class="step-label">NuMind</div>
+            <div class="step-connector"></div>
+        </div>
+        <div class="step">
+            <div class="step-icon active">3</div>
+            <div class="step-label">LLM Extraction</div>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
 # --- Stepper Example (replace old stepper/summary UI) ---
 if 'processing_state' not in st.session_state:
     st.session_state.processing_state = 'upload'
@@ -572,10 +592,10 @@ if st.session_state.processing_state == 'results':
         </div>
     """, unsafe_allow_html=True)
     st.success("All done! Here are the details we found in your document. Click any card to see more.")
-    results = st.session_state.get('evaluation_results', [])
-    if results:
+    # --- Extraction Results as Card Grid ---
+    if st.session_state.get('evaluation_results'):
         st.markdown('<div class="card-grid">', unsafe_allow_html=True)
-        for i, result in enumerate(results):
+        for result in st.session_state['evaluation_results']:
             if isinstance(result, dict):
                 prompt_name = result.get('Prompt Name', 'Unknown')
                 extracted_value = result.get('Extracted Value', '')
