@@ -2202,6 +2202,7 @@ else:
     # This logic might need review depending on how Stage 1/2 errors are handled
     elif (st.session_state.pdf_chain or st.session_state.web_chain) and st.session_state.extraction_performed:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
+
 with right_col:
     st.markdown("""
         <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
