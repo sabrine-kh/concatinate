@@ -983,7 +983,6 @@ if st.session_state.evaluation_results:
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
-    # Build all cards in a single HTML string for flex row
     cards_html = '<div style="display: flex; flex-direction: row; gap: 1rem; overflow-x: auto; padding: 1rem 0; white-space: nowrap;">'
     for key, value in extracted_data.items():
         display_value = value[:100] + "..." if len(value) > 100 else value
