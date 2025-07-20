@@ -37,246 +37,37 @@ debug_logger.info("Initial session state", data=dict(st.session_state), context=
 
 # --- UI Setup ---
 st.markdown(
-    """<style>
-    [data-testid='stSidebarNav'] {display: none;}
-    
-    /* Blue band header styling */
-    .header-band {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
-        color: white;
-        padding: 0.7rem 0;
-        margin: -1rem -1rem 2rem -1rem;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
-    }
-    
-    .header-band h1 {
-        font-size: 2.2em;
-        margin: 0;
-        font-weight: bold;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    .header-band h2 {
-        font-size: 1.8em;
-        margin: 0.5rem 0 0 0;
-        font-weight: 300;
-        opacity: 0.9;
-    }
-    
-    /* Stepper Bar Styling (add this HTML where you want the stepper):
-    <div class="stepper-bar">
-      <div class="stepper-step step-active">1. Web Extraction</div>
-      <div class="stepper-step">2. NuMind</div>
-      <div class="stepper-step">3. LLM Recheck</div>
-      <div class="stepper-step">4. Extraction Results</div>
-    </div>
-    */
-    .stepper-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin: 2rem 0 2rem 0;
-        padding: 0 0.5rem;
-        background: #f4f8fb;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(30,60,114,0.07);
-        overflow-x: auto;
-    }
-    .stepper-step {
-        flex: 1 1 0;
-        text-align: center;
-        padding: 1rem 0.5rem;
-        font-weight: 600;
-        color: #1e3c72;
-        border-bottom: 4px solid #b0c4de;
-        background: none;
-        font-size: 1.1em;
-        transition: border-color 0.3s, color 0.3s;
-    }
-    .stepper-step.step-active {
-        color: #2a5298;
-        border-bottom: 4px solid #2a5298;
-        background: linear-gradient(90deg, #e3f0fc 0%, #f8fafd 100%);
-    }
-    .stepper-step:not(:last-child)::after {
-        content: "";
-        display: inline-block;
-        width: 24px;
-        height: 2px;
-        background: #b0c4de;
-        margin: 0 8px;
-        vertical-align: middle;
-    }
-    
-    /* Button styling with blue theme */
-    .stButton > button {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 12px 24px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.2);
-    }
-    
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #2a5298 0%, #4a90e2 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.4);
-    }
-    
-    /* Sidebar styling */
-    .css-1d391kg {
-        background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
-    }
-    
-    /* Section headers styling */
-    .section-header {
-        color: #1e3c72;
-        font-size: 2em;
-        margin-bottom: 1rem;
-        font-weight: 600;
-    }
-    
-    /* Info boxes styling */
-    .stAlert {
-        border-left: 4px solid #1e3c72;
-    }
-    
-    /* Success messages styling */
-    .stSuccess {
-        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-        border: 1px solid #1e3c72;
-    }
-    
-    /* Warning messages styling */
-    .stWarning {
-        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-        border: 1px solid #1e3c72;
-    }
-    
-    /* Data editor styling */
-    .stDataFrame {
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
-    }
-    
-    /* Metrics styling */
-    .metric-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 2px solid #1e3c72;
-        border-radius: 10px;
-        padding: 1rem;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
-    }
-    
-    .metric-value {
-        font-size: 2em;
-        font-weight: bold;
-        color: #1e3c72;
-        margin: 0.5rem 0;
-    }
-    
-    .metric-label {
-        color: #6c757d;
-        font-size: 0.9em;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* Right pane styling */
-    .right-pane {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-left: 3px solid #1e3c72;
-        border-radius: 0 15px 15px 0;
-        padding: 1.5rem;
-        box-shadow: -5px 0 15px rgba(30, 60, 114, 0.1);
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-    
-    /* Chat container styling */
-    .chat-container {
-        max-height: 400px;
-        overflow-y: auto;
-        padding: 1rem;
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
-        margin-bottom: 1rem;
-    }
-    
-    /* Chatbot styling */
-    .chat-container {
-        background: white;
-        border-radius: 15px;
-        padding: 1rem;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
-        margin-bottom: 1rem;
-    }
-    
-    .chat-message {
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-        border-radius: 15px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-left: 4px solid #1e3c72;
-    }
-    
-    .chat-message.user {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-        margin-left: 2rem;
-    }
-    
-    .chat-message.assistant {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        color: #1e3c72;
-        margin-right: 2rem;
-    }
-    
-    /* Extraction Results Styling - SIMPLE VERTICAL LIST */
-    .extraction-results {
-        background: none;
-        border-radius: 0;
-        padding: 0.5rem 0 0.5rem 0;
-        box-shadow: none;
-        margin-bottom: 1rem;
-    }
-    .result-item {
-        background: none;
-        border: none;
-        border-bottom: 1px solid #e0e6ef;
-        border-radius: 0;
-        padding: 0.5rem 0;
-        margin: 0;
-        transition: none;
-        box-shadow: none;
-        display: block;
-    }
-    .result-item:last-child {
-        border-bottom: none;
-    }
-    .result-label {
-        font-weight: 600;
-        color: #1e3c72;
-        margin-bottom: 0.2rem;
-        font-size: 1em;
-    }
-    .result-value {
-        background: none;
-        border: none;
-        border-radius: 0;
-        padding: 0;
-        font-weight: 500;
-        color: #222;
-        font-size: 1em;
-        word-break: break-word;
-    }
-    </style>""",
+    """
+    <style>
+    /* Global Reset and Base Styles */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    .main-container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+    .header-band { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%); color: white; padding: 1rem; text-align: center; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3); }
+    .header-band h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3); }
+    .header-band h2 { font-size: 1.5rem; font-weight: 300; opacity: 0.9; }
+    .stepper-container { display: flex; justify-content: space-between; margin: 2rem 0; padding: 1rem; background: #f8f9fa; border-radius: 12px; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1); }
+    .stepper-item { flex: 1; text-align: center; padding: 1rem; border-radius: 8px; background: linear-gradient(135deg, #ffffff 0%, #e9ecef 100%); border: 2px solid #1e3c72; margin: 0 0.5rem; transition: transform 0.3s ease; }
+    .stepper-item:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2); }
+    .stepper-item h4 { color: #1e3c72; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .stepper-item p { color: #6c757d; font-size: 0.9rem; }
+    .extraction-results { background: white; border-radius: 12px; padding: 1.5rem; margin: 2rem 0; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1); }
+    .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .result-item { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 2px solid #1e3c72; border-radius: 12px; padding: 1rem; transition: transform 0.3s ease; }
+    .result-item:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2); }
+    .result-label { font-weight: 600; color: #1e3c72; font-size: 1.1rem; margin-bottom: 0.5rem; border-bottom: 2px solid #1e3c72; padding-bottom: 0.5rem; }
+    .result-value { background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 0.5rem; font-weight: 500; word-break: break-word; }
+    .recheck-container { background: white; border-radius: 12px; padding: 1.5rem; margin: 2rem 0; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1); }
+    .recheck-container h3 { color: #1e3c72; font-size: 1.8rem; margin-bottom: 1rem; }
+    .download-container { display: flex; gap: 1rem; margin: 2rem 0; justify-content: center; }
+    .stButton > button { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; border: none; border-radius: 10px; padding: 0.75rem 1.5rem; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.2); }
+    .stButton > button:hover { background: linear-gradient(135deg, #2a5298 0%, #4a90e2 100%); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(30, 60, 114, 0.4); }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 1rem; }
+    [data-testid="stSidebar"] h2 { color: white; font-size: 1.8rem; margin-bottom: 1rem; }
+    [data-testid="stSidebar"] .stButton > button { width: 100%; margin-bottom: 0.5rem; }
+    .stDataFrame { border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1); }
+    @media (max-width: 768px) { .stepper-container { flex-direction: column; gap: 1rem; } .stepper-item { margin: 0; } .results-grid { grid-template-columns: 1fr; } .download-container { flex-direction: column; } }
+    </style>
+    """,
     unsafe_allow_html=True
 )
 
@@ -2104,23 +1895,13 @@ else:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
 with right_col:
     st.markdown("""
-        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-                    color: white; 
-                    padding: 1rem; 
-                    border-radius: 15px; 
-                    text-align: center; 
-                    margin-bottom: 1rem;">
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 1rem; border-radius: 15px; text-align: center; margin-bottom: 1rem;">
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
-    
-    # Display extraction results in a beautiful format
     if st.session_state.evaluation_results:
-        st.markdown("""
-            <div class="extraction-results">
-        """, unsafe_allow_html=True)
-        
-        # Create a summary of extracted data
+        st.markdown('<div class="extraction-results">', unsafe_allow_html=True)
+        st.markdown('<div class="results-grid">', unsafe_allow_html=True)
         extracted_data = {}
         for result in st.session_state.evaluation_results:
             if isinstance(result, dict):
@@ -2128,48 +1909,22 @@ with right_col:
                 extracted_value = result.get('Extracted Value', '')
                 if extracted_value and extracted_value != 'NOT FOUND' and extracted_value != 'ERROR':
                     extracted_data[prompt_name] = extracted_value
-        
-        # Display each extracted item beautifully
         for key, value in extracted_data.items():
-            # Truncate long values for better display
             display_value = value[:100] + "..." if len(value) > 100 else value
             st.markdown(f"""
                 <div class="result-item">
-                    <div class="result-label">🔍 {key}</div>
+                    <div class="result-label">{key}</div>
                     <div class="result-value" title="{value}">{display_value}</div>
                 </div>
             """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Success metrics
-        if st.session_state.evaluation_metrics:
-            metrics = st.session_state.evaluation_metrics
-            st.markdown("""
-                <div style="background: white; border-radius: 15px; padding: 1rem; margin: 1rem 0; box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);">
-                    <h4 style="color: #1e3c72; margin-bottom: 1rem;">📈 Success Metrics</h4>
-            """, unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                success_rate = metrics.get('success_rate', 0)
-                st.metric("Success Rate", f"{success_rate:.1%}")
-            with col2:
-                total_fields = metrics.get('total_fields', 0)
-                st.metric("Total Fields", total_fields)
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("📄 Upload and process documents to see extracted results here.")
     
     # Chatbot Section
     st.markdown("""
-        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-                    color: white; 
-                    padding: 1rem; 
-                    border-radius: 15px; 
-                    text-align: center; 
-                    margin: 2rem 0 1rem 0;">
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 1rem; border-radius: 15px; text-align: center; margin: 2rem 0 1rem 0;">
             <h3 style="margin: 0; font-size: 1.5em;">💬 Chat with Your Data</h3>
         </div>
     """, unsafe_allow_html=True)
