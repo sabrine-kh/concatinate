@@ -1849,10 +1849,6 @@ else:
 
         # Info message removed as requested
 
-        # --- Mini Debug Widget ---
-        from debug_interface import create_mini_debug_widget
-        create_mini_debug_widget()
-        
         # --- Manual Recheck Section ---
         st.divider()
         st.subheader("🔄 Manual Attribute Recheck")
