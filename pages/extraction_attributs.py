@@ -818,7 +818,8 @@ with right_col:
             <h3 style="margin: 0; font-size: 1.5em;">📊 Extraction Results</h3>
         </div>
     """, unsafe_allow_html=True)
-    # ... rest of the extraction results/progress/cards/chat code ...
+    # Move all extraction results/progress/cards/chat code here from the old right_col section
+    # (Copy everything from the previous right_col: progress UI, extraction cards, metrics, chat, etc.)
 
 # --- Get current asyncio event loop --- 
 # Needed for both scraping and running the async extraction chain
