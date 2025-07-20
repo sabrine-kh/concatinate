@@ -827,7 +827,7 @@ groq_client = initialize_chatbot()
 left_col, right_col = st.columns([2, 1])
 
 with left_col:
-    st.header("2. Extracted Information")
+    st.header("Extraction Results")
 
 # --- Get current asyncio event loop --- 
 # Needed for both scraping and running the async extraction chain
