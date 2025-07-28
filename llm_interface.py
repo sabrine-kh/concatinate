@@ -1,5 +1,4 @@
 # llm_interface.py
-import requests
 import json
 from typing import List, Dict, Optional
 from loguru import logger
@@ -21,7 +20,6 @@ from bs4 import BeautifulSoup # Import BeautifulSoup
 import hashlib
 import datetime
 import os
-import json
 
 RETRIEVED_CHUNKS_LOG = os.path.join(os.path.dirname(__file__), 'retrieved_chunks_log.jsonl')
 
@@ -219,148 +217,6 @@ def retrieve_and_log_chunks(retriever, query: str, attribute_key: str):
         _log_retrieved_chunks(attribute_key, query, [])
         return []
 
-@logger.catch(reraise=True)
-def get_answer_from_llm_langchain(question: str, retriever: VectorStoreRetriever) -> Optional[str]:
-    """
-    Generates an answer using Groq via LangChain, based on retrieved context.
-
-    Args:
-        question: The user's question.
-        retriever: The configured vector store retriever.
-
-    Returns:
-        The generated answer string, or None if an error occurs.
-    """
-    # This function relies on initialize_llm() being available, but doesn't call it directly now
-    # because app.py initializes the LLM and passes it to create_extraction_chain
-    # We can actually remove this function if ONLY extraction is needed.
-    # For now, just ensure initialize_llm exists for app.py to call.
-    pass # Keep as placeholder or remove if unused
-
-
-# --- Option 2: Using Raw Requests (Your original approach, adapted) ---
-# Keep this if you prefer not to use langchain_groq or need fine-grained request control
-
-# @logger.catch(reraise=True)
-# def get_answer_from_llm_requests(question: str, retriever: VectorStoreRetriever) -> Optional[str]:
-#     """QA using Groq API via direct requests and retrieved context."""
-#     if not config.GROQ_API_KEY:
-#         logger.error("Groq API key is not configured.")
-#         raise ValueError("Groq API Key is missing.")
-#     if not config.GROQ_API_URL:
-#         logger.error("GROQ_API_URL is not configured for requests method.")
-#         raise ValueError("GROQ_API_URL is missing.")
-
-#     logger.info(f"Retrieving document chunks for question: {question[:50]}...")
-#     results = retriever.invoke(question)
-
-#     if not results:
-#         logger.warning("No relevant document chunks found in ChromaDB.")
-#         return "I couldn't find relevant information in the uploaded documents to answer that question."
-
-#     logger.info(f"Retrieved {len(results)} relevant document chunks.")
-
-#     # Constructing the context
-#     context_parts = []
-#     for i, doc in enumerate(results):
-#         source = doc.metadata.get('source', 'Unknown')
-#         page = doc.metadata.get('page', 'N/A')
-#         start_index = doc.metadata.get('start_index', None)
-#         chunk_info = f"Chunk {i+1}" + (f" (starts at char {start_index})" if start_index is not None else "")
-#         context_parts.append(
-#             f"{chunk_info} from '{source}' (Page {page}):\n{doc.page_content}"
-#         )
-#     context = "\n\n---\n\n".join(context_parts)
-
-#     # Formulating the prompt for Groq
-#     system_prompt = f"""You are a helpful assistant. Answer the user's question based *only* on the provided context chunks from PDF documents.
-# If the context doesn't contain the answer, state that you cannot answer based on the provided information.
-# When possible, mention the source document (e.g., '{results[0].metadata.get('source', 'Unknown')}') where the information was found.
-# Do not make up information."""
-
-#     user_prompt = f"""Context Chunks:
-#     ---------------------
-#     {context}
-#     ---------------------
-
-#     Question: {question}
-
-#     Answer:"""
-
-#     # Defining Groq API request payload
-#     payload = {
-#         "model": config.LLM_MODEL_NAME, # Use model name from config
-#         "messages": [
-#             {"role": "system", "content": system_prompt},
-#             {"role": "user", "content": user_prompt}
-#         ],
-#         "max_tokens": config.LLM_MAX_OUTPUT_TOKENS,
-#         "temperature": config.LLM_TEMPERATURE,
-#         "top_p": 1, # Often 1 or slightly less
-#     }
-
-#     # Headers for Groq API
-#     headers = {
-#         "Authorization": f"Bearer {config.GROQ_API_KEY}",
-#         "Content-Type": "application/json"
-#     }
-
-#     logger.info(f"Sending request to Groq API (model: {config.LLM_MODEL_NAME})...")
-#     try:
-#         response = requests.post(
-#             config.GROQ_API_URL,
-#             headers=headers,
-#             json=payload,
-#             timeout=90 # Increased timeout
-#         )
-#         response.raise_for_status() # Raises HTTPError for bad responses (4xx or 5xx)
-
-#         response_data = response.json()
-
-#         if 'choices' not in response_data or not response_data['choices']:
-#             logger.error(f"Invalid response format from Groq API: 'choices' missing or empty. Response: {response_data}")
-#             raise ValueError("Received an invalid response format from the Groq API.")
-
-#         first_choice = response_data['choices'][0]
-#         if 'message' not in first_choice or 'content' not in first_choice['message']:
-#             logger.error(f"Invalid response format: 'message' or 'content' missing. Choice: {first_choice}")
-#             raise ValueError("Received an incomplete response from the Groq API.")
-
-#         message_content = first_choice['message']['content']
-#         cleaned_answer = message_content.strip() if message_content else "The API returned an empty answer."
-
-#         logger.success("Groq API call successful. Returning answer.")
-#         return cleaned_answer
-
-#     except requests.exceptions.Timeout:
-#         logger.error("Network Error: Request to Groq API timed out.")
-#         raise TimeoutError("Network Error: Connection to Groq timed out.")
-#     except requests.exceptions.HTTPError as http_err:
-#         status_code = http_err.response.status_code
-#         error_text = http_err.response.text[:500] # Limit error text length
-#         logger.error(f"HTTP Error {status_code} contacting Groq API: {error_text}", exc_info=True)
-#         if status_code == 401:
-#             raise PermissionError("Groq API authentication failed (401). Check your key.")
-#         elif status_code == 429:
-#             raise ConnectionAbortedError("Groq API rate limit exceeded (429). Please wait.")
-#         elif status_code == 413 or "too large" in error_text.lower():
-#              raise ValueError("Input payload too large for Groq API (413), even after splitting.")
-#         elif status_code >= 500:
-#              raise ConnectionError(f"Groq API server error ({status_code}). Please try again later.")
-#         else:
-#              raise ConnectionError(f"Groq API request failed with status {status_code}: {error_text}")
-#     except requests.exceptions.RequestException as req_err:
-#         logger.error(f"Network Error contacting Groq API: {req_err}", exc_info=True)
-#         raise ConnectionError(f"Network Error: Could not connect to Groq API. {req_err}")
-#     except json.JSONDecodeError as json_err:
-#          logger.error(f"Failed to decode JSON response from Groq API: {json_err}", exc_info=True)
-#          raise ValueError(f"Invalid JSON received from Groq API: {response.text[:200]}...") # Show start of text
-#     except Exception as e:
-#         logger.error(f"An unexpected error occurred during LLM request: {e}", exc_info=True)
-#         raise RuntimeError(f"An unexpected error occurred: {e}")
-
-# --- LLM-Free Web Scraping Configuration (Revised for Table HTML) ---
-
 # Configure websites to scrape, in order of preference.
 # We now target the main table/container holding the product features.
 WEBSITE_CONFIGS = [
@@ -393,15 +249,7 @@ WEBSITE_CONFIGS = [
         ),
         # Selector for the main container holding the features/specifications table
         "table_selector": "#pdp-features-tabpanel" # Example selector - VERIFY!
-    },
-    {
-        "name": "TraceParts",
-        "base_url_template": "https://www.traceparts.com/en/search?CatalogPath=&KeepFilters=true&Keywords={part_number}&SearchAction=Keywords",
-        "pre_extraction_js": None, # Assuming no interaction needed for TraceParts search results page
-        # Selector for the table or div containing technical data on TraceParts
-        "table_selector": ".technical-data" # Example selector - VERIFY!
-    },
-    # Add other supplier websites here following the same structure
+    }
 ]
 
 # --- HTML Cleaning Function ---
@@ -447,21 +295,6 @@ def clean_scraped_html(html_content: str, site_name: str) -> Optional[str]:
                 logger.info(f"Extracted {len(extracted_texts)} features from TE Connectivity HTML.")
             else:
                  logger.warning(f"Could not find 'li.product-feature' items in the TE Connectivity HTML provided.")
-
-        elif site_name == "TraceParts":
-            # Add parsing logic specific to TraceParts HTML structure here
-            # Example: Find a table and extract rows/cells
-            # data_table = soup.find('table', class_='technical-data-table') # Example selector
-            # if data_table:
-            #    for row in data_table.find_all('tr'):
-            #        cells = row.find_all('td') # or 'th'
-            #        if len(cells) == 2:
-            #             key = cells[0].get_text(strip=True).replace(':', '').strip()
-            #             value = cells[1].get_text(strip=True)
-            #             if key and value:
-            #                 extracted_texts.append(f"{key}: {value}")
-            logger.warning(f"HTML cleaning logic for TraceParts is not implemented yet.")
-            pass # Placeholder
 
         # Add logic for other sites if needed
         else:
@@ -1006,9 +839,3 @@ async def _invoke_chain_and_process(chain, input_data, attribute_key):
     logger.info(log_msg)
 
     return response # Validation happens in the caller (app.py now)
-
-
-# --- REMOVE Unified Chain and Old run_extraction ---
-# def create_extraction_chain(retriever, llm): ...
-# @logger.catch(reraise=True)
-# async def run_extraction(...): ...

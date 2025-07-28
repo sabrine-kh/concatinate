@@ -1,35 +1,30 @@
 import streamlit as st
-st.set_page_config(page_title="PDF Attribute Extraction", layout="wide")
+from utils.thinking_log_component import thinking_log_component
+st.set_page_config(layout="wide")
 
 from loguru import logger
 import sys
 logger.remove()
 logger.add(sys.stderr, level="DEBUG")
-logger.debug("TEST DEBUG LOG: If you see this, DEBUG logging is working.")
+# logger.debug("TEST DEBUG LOG: If you see this, DEBUG logging is working.")  # Debug log commented out
 
 # --- Force python to use pysqlite3 based on chromadb docs ---
 __import__('pysqlite3')
-import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 # --- End override ---
 
 # --- DEBUG LOGGER INTEGRATION ---
 from debug_logger import debug_logger, DebugTimer, log_streamlit_state, log_json_parsing
-debug_logger.info("Extraction page loaded", context={"page": "extraction_attributs"})
+# debug_logger.info("Extraction page loaded", context={"page": "extraction_attributs"})  # Debug log commented out
 
 import os
 import time
-from loguru import logger
 import json
 import pandas as pd
 import asyncio
 import subprocess
 import nest_asyncio
-from typing import List
 import re
-from groq import Groq
-import requests
-from sentence_transformers import SentenceTransformer
 import config
 
 nest_asyncio.apply()
@@ -46,22 +41,20 @@ st.markdown(
     .header-band {
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
         color: white;
-        padding: 0.1rem 0;
-        margin: 0 0 0.2rem 0;
         text-align: center;
-        box-shadow: 0 2px 6px rgba(30, 60, 114, 0.15);
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
     }
     
     .header-band h1 {
-        font-size: 2em;
+        font-size: 2.2em;
         margin: 0;
         font-weight: bold;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
     
     .header-band h2 {
-        font-size: 1.2em;
-        margin: 0.1rem 0 0 0;
+        font-size: 1.8em;
+        margin: 0.5rem 0 0 0;
         font-weight: 300;
         opacity: 0.9;
     }
@@ -71,17 +64,17 @@ st.markdown(
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         color: white;
         border: none;
-        border-radius: 4px;
-        padding: 2px 8px;
+        border-radius: 10px;
+        padding: 12px 24px;
         font-weight: 600;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 6px rgba(30, 60, 114, 0.08);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.2);
     }
     
     .stButton > button:hover {
         background: linear-gradient(135deg, #2a5298 0%, #4a90e2 100%);
-        transform: translateY(-1px);
-        box-shadow: 0 3px 8px rgba(30, 60, 114, 0.15);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.4);
     }
     
     /* Sidebar styling */
@@ -92,93 +85,80 @@ st.markdown(
     /* Section headers styling */
     .section-header {
         color: #1e3c72;
-        font-size: 1.2em;
-        margin-bottom: 0.2rem;
+        font-size: 2em;
+        margin-bottom: 1rem;
         font-weight: 600;
     }
     
     /* Info boxes styling */
     .stAlert {
-        border-left: 2px solid #1e3c72;
-        padding: 0.1rem 0.2rem;
+        border-left: 4px solid #1e3c72;
     }
     
     /* Success messages styling */
     .stSuccess {
         background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
         border: 1px solid #1e3c72;
-        padding: 0.1rem 0.2rem;
     }
     
     /* Warning messages styling */
     .stWarning {
         background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
         border: 1px solid #1e3c72;
-        padding: 0.1rem 0.2rem;
     }
     
     /* Horizontal table styling */
     .horizontal-table {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.2rem;
-        margin: 0.2rem 0;
+        gap: 1rem;
     }
     
     .attribute-card {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border: 1.5px solid #1e3c72;
-        border-radius: 4px;
-        padding: 0.1rem 0.2rem 0.2rem 0.2rem;
-        min-width: 0;
-        width: 100%;
-        box-shadow: 0 1px 3px rgba(30, 60, 114, 0.04);
-        margin: 0 0 0.2rem 0;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
+        border: 2px solid #1e3c72;
+        border-radius: 12px;
+        min-width: 300px;
+        flex: 1;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+        transition: all 0.3s ease;
     }
     
     .attribute-card:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(30, 60, 114, 0.08);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.2);
     }
     
     .attribute-card h4 {
         color: #1e3c72;
-        margin: 0 0 0.1rem 0;
-        font-size: 1em;
-        font-weight: 700;
-        border-bottom: 1px solid #1e3c72;
-        padding-bottom: 0.1rem;
-        width: 100%;
+        margin: 0 0 0.5rem 0;
+        font-size: 1.1em;
+        font-weight: 600;
+        border-bottom: 2px solid #1e3c72;
+        padding-bottom: 0.5rem;
     }
     
     .attribute-value {
-        background: #fff;
+        background: white;
         border: 1px solid #dee2e6;
-        border-radius: 3px;
-        padding: 0.1rem 0.2rem;
-        margin: 0.05rem 0 0 0;
+        border-radius: 6px;
+        margin: 0.5rem 0;
         font-weight: 500;
-        font-size: 0.95em;
-        width: 100%;
-        box-sizing: border-box;
     }
     
     .attribute-source {
-        font-size: 0.7em;
+        font-size: 0.8em;
         color: #6c757d;
         font-style: italic;
-        margin-top: 0.1rem;
+        margin-top: 0.5rem;
     }
     
     .success-indicator {
         display: inline-block;
-        width: 10px;
-        height: 10px;
+        width: 12px;
+        height: 12px;
         border-radius: 50%;
-        margin-right: 0.2rem;
+        margin-right: 0.5rem;
     }
     
     .success-true {
@@ -191,62 +171,57 @@ st.markdown(
     
     /* Data editor styling */
     .stDataFrame {
-        border-radius: 4px;
+        border-radius: 10px;
         overflow: hidden;
-        box-shadow: 0 2px 6px rgba(30, 60, 114, 0.05);
-        padding: 0.1rem;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
     }
     
     /* Metrics styling */
     .metric-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 1.5px solid #1e3c72;
-        border-radius: 4px;
-        padding: 0.2rem;
+        border: 2px solid #1e3c72;
+        border-radius: 10px;
         text-align: center;
-        box-shadow: 0 2px 6px rgba(30, 60, 114, 0.05);
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
     }
     
     .metric-value {
-        font-size: 1.2em;
+        font-size: 2em;
         font-weight: bold;
         color: #1e3c72;
-        margin: 0.1rem 0;
+        margin: 0.5rem 0;
     }
     
     .metric-label {
         color: #6c757d;
-        font-size: 0.8em;
-        margin-bottom: 0.1rem;
+        font-size: 0.9em;
+        margin-bottom: 0.5rem;
     }
     
     /* Right pane styling */
     .right-pane {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-left: 2px solid #1e3c72;
-        border-radius: 0 8px 8px 0;
-        padding: 0.2rem;
-        box-shadow: -2px 0 6px rgba(30, 60, 114, 0.04);
+        border-left: 3px solid #1e3c72;
+        border-radius: 0 15px 15px 0;
+        box-shadow: -5px 0 15px rgba(30, 60, 114, 0.1);
         max-height: 90vh;
         overflow-y: auto;
     }
     
     /* Chat container styling */
     .chat-container {
-        max-height: 300px;
+        max-height: 400px;
         overflow-y: auto;
-        padding: 0.2rem;
         background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(30, 60, 114, 0.04);
-        margin-bottom: 0.2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
+        margin-bottom: 1rem;
     }
     
     /* Chatbot styling */
     .chat-container {
         background: white;
         border-radius: 15px;
-        padding: 1rem;
         box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
         margin-bottom: 1rem;
     }
@@ -254,7 +229,6 @@ st.markdown(
     .chat-message {
         background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
         border-radius: 15px;
-        padding: 1rem;
         margin: 0.5rem 0;
         border-left: 4px solid #1e3c72;
     }
@@ -274,7 +248,6 @@ st.markdown(
     .extraction-results {
         background: white;
         border-radius: 15px;
-        padding: 1rem;
         box-shadow: 0 4px 15px rgba(30, 60, 114, 0.1);
         margin-bottom: 1rem;
     }
@@ -283,9 +256,9 @@ st.markdown(
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border: 1px solid #dee2e6;
         border-radius: 10px;
-        padding: 1rem;
         margin: 0.5rem 0;
         transition: all 0.3s ease;
+        padding: 1rem 1.2rem;
     }
     
     .result-item:hover {
@@ -303,14 +276,12 @@ st.markdown(
         background: white;
         border: 1px solid #dee2e6;
         border-radius: 6px;
-        padding: 0.5rem;
         font-weight: 500;
+        padding: 0.7rem 1rem;
     }
     </style>""",
     unsafe_allow_html=True
 )
-
-# --- Chatbot Functions ---
 
 # --- Navigation Sidebar ---
 with st.sidebar:
@@ -321,10 +292,6 @@ with st.sidebar:
         st.switch_page("pages/chatbot.py")
     if st.button("📄 Extract a new Part"):
         st.switch_page("pages/extraction_attributs.py")
-    if st.button("🔍 Debug Interface"):
-        st.switch_page("debug_interface.py")
-    if st.button("📊 Debug Summary"):
-        st.switch_page("debug_summary.py")
 
 def extract_json_from_string(s):
     """
@@ -343,6 +310,51 @@ def extract_json_from_string(s):
         except Exception:
             return None
     return None
+
+# --- Helper for Thinking Log State ---
+def get_thinking_log_args():
+    """Gets the arguments for the thinking log component from session state."""
+    state = st.session_state.get('thinking_log', None)
+    if not state:
+        # Initialize if it doesn't exist
+        state = {
+            'step': 'Ready',
+            'log': 'Upload documents and process to begin.',
+            'is_active': False,
+            'start_time': time.time(),
+        }
+        st.session_state.thinking_log = state
+    elapsed = int(time.time() - state['start_time'])
+    if elapsed < 60:
+        elapsed_str = f"{elapsed}s"
+    else:
+        elapsed_str = f"{elapsed//60}m {elapsed%60}s"
+    return (state['step'], elapsed_str, state['log'], state['is_active'])
+
+def render_thinking_log(placeholder):
+    """Renders the current thinking log state into a placeholder."""
+    with placeholder.container():
+        step, elapsed, log, is_active = get_thinking_log_args()
+        thinking_log_component(
+            current_step_text=step,
+            time_elapsed=elapsed,
+            log_content=log,
+            is_active=is_active
+        )
+
+def update_thinking_log(step, log, is_active=True, reset_time=False, placeholder=None):
+    """Updates the thinking log state and optionally re-renders it in a placeholder."""
+    if 'thinking_log' not in st.session_state:
+        st.session_state.thinking_log = {
+            'step': '', 'log': '', 'is_active': False, 'start_time': time.time(),
+        }
+    if reset_time or st.session_state.thinking_log['step'] != step:
+        st.session_state.thinking_log['start_time'] = time.time()
+    st.session_state.thinking_log['step'] = step
+    st.session_state.thinking_log['log'] = log
+    st.session_state.thinking_log['is_active'] = is_active
+    if placeholder:
+        render_thinking_log(placeholder)
 
 # --- Playwright Browser Installation ---
 def install_playwright_browsers():
@@ -573,19 +585,19 @@ if embedding_function is None or llm is None:
     st.error("Core components (Embeddings or LLM) failed to initialize. Cannot continue.")
     st.stop()
 
-# --- UI Layout ---
-# Blue band header with LEONI
-
-
-# Blue band header with LEONI
+# --- MAIN PAGE HEADER AND THINKING LOG ---
 st.markdown("""
     <div class="header-band">
-        <h1>LEONI</h1>
+        <h1>LEOPARTS</h1>
+        <h2>LEONI</h2>
     </div>
 """, unsafe_allow_html=True)
+st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
 
-st.markdown("### 📄 PDF Attribute Extraction")
-st.markdown("Upload your PDF documents and automatically extract key attributes.")
+log_placeholder = st.empty()  # Create the placeholder exactly where you want the thinking log
+st.session_state['log_placeholder'] = log_placeholder  # Store in session state for access in callbacks
+render_thinking_log(log_placeholder)
+
 
 if not config.GROQ_API_KEY:
     st.warning("Groq API Key not found. Please set the GROQ_API_KEY environment variable.", icon="⚠️")
@@ -622,7 +634,10 @@ with st.sidebar:
             # Store uploaded file data for NuMind extraction
             st.session_state.uploaded_file_data = [(f.name, f.getvalue()) for f in uploaded_files]
             logger.info(f"Starting processing for {len(filenames)} files: {', '.join(filenames)}")
+            update_thinking_log("Starting Processing", f"Starting processing for {len(filenames)} files: {', '.join(filenames)}", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
             # --- PDF Processing ---
+            update_thinking_log("Processing PDFs", f"Processing files: {', '.join(filenames)}", is_active=True, reset_time=True, placeholder=st.session_state['log_placeholder'])
+
             with st.spinner("Processing PDFs... Loading, cleaning, splitting..."):
                 processed_docs = [] # Initialize as empty list instead of None
                 try:
@@ -641,6 +656,7 @@ with st.sidebar:
                     
                     processing_time = time.time() - start_time
                     logger.info(f"PDF processing took {processing_time:.2f} seconds.")
+                    update_thinking_log("PDF Processing", f"PDF processing took {processing_time:.2f} seconds.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                 except Exception as e:
                     logger.error(f"Failed during PDF processing phase: {e}", exc_info=True)
                     st.error(f"Error processing PDFs: {e}")
@@ -649,12 +665,14 @@ with st.sidebar:
             # --- Vector Store Indexing ---
             if processed_docs and len(processed_docs) > 0:
                 logger.info(f"Generated {len(processed_docs)} documents.")
+                update_thinking_log("Documents Generated", f"Generated {len(processed_docs)} documents.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                 with st.spinner("Indexing documents in vector store..."):
                     try:
                         start_time = time.time()
                         st.session_state.retriever = setup_vector_store(processed_docs, embedding_function)
                         indexing_time = time.time() - start_time
                         logger.info(f"Vector store setup took {indexing_time:.2f} seconds.")
+                        update_thinking_log("Vector Store Setup", f"Vector store setup took {indexing_time:.2f} seconds.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
 
                         if st.session_state.retriever:
                             st.session_state.processed_files = filenames # Update list
@@ -685,6 +703,7 @@ with st.sidebar:
 
     elif process_button and not uploaded_files:
         st.warning("Please upload at least one PDF file before processing.")
+        update_thinking_log("Upload Instructions", "Upload and process PDF documents to view extracted data.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
 
     # --- Display processed files status (Simplified) ---
     st.subheader("Processing Status")
@@ -692,19 +711,11 @@ with st.sidebar:
     if st.session_state.pdf_chain and st.session_state.web_chain and st.session_state.processed_files:
         st.success(f"Ready. Processed: {', '.join(st.session_state.processed_files)}")
     else:
-        st.info("Upload and process PDF documents to view extracted data.")
+
+        update_thinking_log("Upload Instructions", "Upload and process PDF documents to view extracted data.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
 
 
 # --- Main Layout with Two Columns ---
-# Initialize chatbot
-
-
-# Create two columns: left for extraction, right for results and chat
-# left_col, right_col = st.columns([2, 1])
-# with left_col:
-#     st.header("2. Extracted Information")
-
-st.header("2. Extracted Information")
 
 # --- Get current asyncio event loop --- 
 # Needed for both scraping and running the async extraction chain
@@ -717,7 +728,7 @@ except RuntimeError:  # 'RuntimeError: There is no current event loop...'
 
 # Check if BOTH chains are ready before proceeding
 if not st.session_state.pdf_chain or not st.session_state.web_chain:
-    st.info("Upload and process documents using the sidebar to see extracted results here.")
+
     # Ensure evaluation state is also clear if no chain
     if not st.session_state.evaluation_results and not st.session_state.extraction_performed:
          reset_evaluation_state() # Ensure reset if no chain and extraction not done
@@ -740,6 +751,7 @@ else:
         
         st.session_state.extraction_attempts += 1
         logger.info(f"Starting extraction process... (attempt {st.session_state.extraction_attempts})")
+        update_thinking_log("Extraction Start", f"Starting extraction process... (attempt {st.session_state.extraction_attempts})", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
         
         # --- Get Part Number --- 
         part_number = st.session_state.get("part_number_input", "").strip()
@@ -762,6 +774,7 @@ else:
             # Check cache first
             if st.session_state.current_part_number_scraped == part_number and st.session_state.scraped_table_html_cache is not None:
                  logger.info(f"Using cached scraped HTML for part number {part_number}.")
+                 update_thinking_log("Web Scrape Cache", f"Using cached scraped HTML for part number {part_number}.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                  scraped_table_html = st.session_state.scraped_table_html_cache
                  debug_logger.info("Using cached web data", data={
                      "part_number": part_number,
@@ -770,6 +783,7 @@ else:
             else:
                  # Scrape and update cache
                  logger.info(f"Part number {part_number} changed or not cached. Attempting web scrape...")
+                 update_thinking_log("Web Scrape", f"Part number {part_number} changed or not cached. Attempting web scrape...", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                  debug_logger.info("Cache miss, starting web scrape", data={
                      "part_number": part_number,
                      "cached_part": st.session_state.current_part_number_scraped
@@ -837,7 +851,7 @@ else:
                           debug_logger.session_state("scraped_table_html_cache", None, context={"step": "web_scraping_cache_clear"})
         else:
              logger.info("No part number provided, skipping web scrape.")
-             debug_logger.info("Skipping web scrape", data={"reason": "No part number provided"}, context={"step": "web_scraping_skipped"})
+             update_thinking_log("Web Scrape Skipped", "No part number provided, skipping web scrape.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
              # Clear cache if part number is removed
              if st.session_state.current_part_number_scraped is not None:
                   st.session_state.scraped_table_html_cache = None
@@ -856,46 +870,10 @@ else:
         # -------------------------------------------------
 
         # --- Block 1b: Three-Stage Extraction Logic --- 
-        st.info(f"Running Stage 1 (Web Data Extraction) for {len(prompts_to_run)} attributes...")
+
+        update_thinking_log("Stage 1 Start", f"Running Stage 1 (Web Data Extraction) for {len(prompts_to_run)} attributes...", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
         
-        # Progress indicator for three-stage process
-        progress_col1, progress_col2, progress_col3 = st.columns(3)
-        with progress_col1:
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
-                            color: white; 
-                            padding: 0.5rem; 
-                            border-radius: 10px; 
-                            text-align: center; 
-                            margin-bottom: 1rem;">
-                    <strong>Stage 1: Web</strong><br>
-                    <small>Web scraping & extraction</small>
-                </div>
-            """, unsafe_allow_html=True)
-        with progress_col2:
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); 
-                            color: white; 
-                            padding: 0.5rem; 
-                            border-radius: 10px; 
-                            text-align: center; 
-                            margin-bottom: 1rem;">
-                    <strong>Stage 2: NuMind</strong><br>
-                    <small>Structured extraction</small>
-                </div>
-            """, unsafe_allow_html=True)
-        with progress_col3:
-            st.markdown("""
-                <div style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); 
-                            color: white; 
-                            padding: 0.5rem; 
-                            border-radius: 10px; 
-                            text-align: center; 
-                            margin-bottom: 1rem;">
-                    <strong>Stage 3: Fallback</strong><br>
-                    <small>Final recheck</small>
-                </div>
-            """, unsafe_allow_html=True)
+
         
         cols = st.columns(2) # For displaying progress
         col_index = 0
@@ -963,6 +941,7 @@ else:
                             )
                             
                             logger.info(f"Stage 1 (Web) for '{attribute_key}' took {run_time:.2f} seconds.")
+                            update_thinking_log(f"Stage 1 Web {attribute_key}", f"Stage 1 (Web) for '{attribute_key}' took {run_time:.2f} seconds.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                             time.sleep(SLEEP_INTERVAL_SECONDS) # Add delay
                         except Exception as e:
                              logger.error(f"Error during Stage 1 (Web) call for '{attribute_key}': {e}", exc_info=True)
@@ -1019,6 +998,7 @@ else:
                             final_answer_value = "NOT FOUND"
                             needs_fallback = True # Mark for PDF stage
                             logger.info(f"Stage 1 result for '{attribute_key}' is NOT FOUND. Queued for PDF fallback.")
+                            update_thinking_log(f"Stage 1 Not Found {attribute_key}", f"Stage 1 result for '{attribute_key}' is NOT FOUND. Queued for PDF fallback.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                             debug_logger.info(f"NOT FOUND for {attribute_key}", data={
                                 "parsed_value": parsed_value,
                                 "needs_fallback": True
@@ -1078,6 +1058,7 @@ else:
                 intermediate_results[prompt_name] = {
                     'Prompt Name': prompt_name,
                     'Extracted Value': final_answer_value, # Store Stage 1 value/error/NOT FOUND
+                    'Ground Truth': '',
                     'Source': source,
                     'Raw Output': raw_output,
                     'Parse Error': str(parse_error) if parse_error else None,
@@ -1105,10 +1086,7 @@ else:
         
         else: # No scraped HTML, all attributes need PDF fallback
             logger.info("No scraped web data available. All attributes will use PDF extraction.")
-            debug_logger.info("No web data, all attributes need PDF fallback", data={
-                "total_attributes": len(prompts_to_run),
-                "fallback_list": list(prompts_to_run.keys())
-            }, context={"step": "stage1_skipped_no_web_data"})
+            update_thinking_log("No Web Data", "No scraped web data available. All attributes will use PDF extraction.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
             
             pdf_fallback_needed = list(prompts_to_run.keys())
             # Populate intermediate results with placeholders indicating skipped web stage
@@ -1116,6 +1094,7 @@ else:
                  intermediate_results[prompt_name] = {
                     'Prompt Name': prompt_name,
                     'Extracted Value': "(Web Stage Skipped)", 
+                    'Ground Truth': '',
                     'Source': 'Pending',
                     'Raw Output': 'N/A',
                     'Parse Error': None,
@@ -1129,7 +1108,8 @@ else:
                 }
 
         # --- Stage 2: NuMind Fallback --- 
-        st.info(f"Running Stage 2 (NuMind Fallback) for {len(pdf_fallback_needed)} attributes...")
+
+        update_thinking_log("Stage 2 Start", f"Running Stage 2 (NuMind Fallback) for {len(pdf_fallback_needed)} attributes...", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
         debug_logger.info("Starting Stage 2 (NuMind Fallback)", data={
             "fallback_count": len(pdf_fallback_needed),
             "fallback_attributes": pdf_fallback_needed
@@ -1322,6 +1302,7 @@ else:
                                     }, context={"step": "stage2_numind_result_stored", "attribute": attribute_key})
                                     
                                     logger.info(f"Updated result for '{prompt_name}' with NuMind data.")
+                                    update_thinking_log(f"NuMind Updated {prompt_name}", f"Updated result for '{prompt_name}' with NuMind data.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                             else:
                                 st.error("NuMind extraction failed. No results returned.")
                                 debug_logger.error("NuMind extraction failed", context={"step": "stage2_numind_failed"})
@@ -1397,7 +1378,8 @@ else:
                     else:
                         other_fallbacks.append(result.get('Prompt Name'))
             
-            st.info(f"Running Stage 3 (Final Fallback) for {len(final_fallback_needed)} attributes that need rechecking...")
+
+            update_thinking_log("Stage 3 Start", f"Running Stage 3 (Final Fallback) for {len(final_fallback_needed)} attributes that need rechecking...", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
             if none_responses:
                 st.warning(f"⚠️ Including {len(none_responses)} attributes that returned 'none' responses - these will be rechecked for potential missed values.")
             
@@ -1594,8 +1576,10 @@ else:
                         # Show feedback for rollback
                         if should_rollback and bool(parse_error):
                             logger.info(f"Stage 3: Rolled back to original '{original_value}' for '{attribute_key}' (Stage 3 error: {parse_error})")
+                            update_thinking_log(f"Stage 3 Rollback {attribute_key}", f"Stage 3: Rolled back to original '{original_value}' for '{attribute_key}' (Stage 3 error: {parse_error})", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                         elif should_rollback and original_value.lower() in ["none", "null", "n/a", "na"]:
                             logger.info(f"Stage 3: Preserved original '{original_value}' for '{attribute_key}' (confirmed by recheck)")
+                            update_thinking_log(f"Stage 3 Preserved {attribute_key}", f"Stage 3: Preserved original '{original_value}' for '{attribute_key}' (confirmed by recheck)", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
                         break
         else:
             st.success("No attributes need final fallback - all extractions completed successfully.")
@@ -1604,7 +1588,14 @@ else:
             }, context={"step": "stage3_skipped_all_successful"})
         
         # --- Stage Summary ---
-        # (REMOVED Extraction Stage Summary UI section)
+        # The Extraction Stage Summary section has been removed as requested.
+        
+        debug_logger.info("Extraction process completed", data={
+            "total_results": len(extraction_results_list),
+            # 'stage_summary' and 'results_summary' removed
+        }, context={"step": "extraction_complete"})
+        
+        # Set extraction_performed flag and handle success/error messages
         extraction_successful = True # Assume success unless critical errors occurred (e.g., chain init)
 
         if extraction_successful:
@@ -1612,188 +1603,323 @@ else:
             st.session_state.extraction_performed = True
             st.session_state.extraction_attempts = 0  # Reset counter on success
             logger.info("Extraction completed successfully, setting extraction_performed=True")
-            st.success("Extraction complete (3-stage process: Web → NuMind → Final Fallback).")
+            update_thinking_log("Extraction Success", "Extraction completed successfully, setting extraction_performed=True", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
+            st.success("Extraction complete (3-stage process: Web → NuMind → Final Fallback). Enter ground truth below.")
+            
             debug_logger.session_state("evaluation_results", extraction_results_list, context={"step": "results_stored"})
             debug_logger.session_state("extraction_performed", True, context={"step": "extraction_flag_set"})
             debug_logger.session_state("extraction_attempts", 0, context={"step": "attempts_reset"})
             debug_logger.info("Extraction completed successfully", context={"step": "extraction_success"})
+            # st.rerun() # REMOVE/COMMENT OUT to keep cards visible
         else:
             st.error("Extraction process encountered critical issues.")
+            # Optionally store partial results if desired
             st.session_state.evaluation_results = extraction_results_list
             st.session_state.extraction_performed = True
             st.session_state.extraction_attempts = 0  # Reset counter even on error
             logger.info("Extraction completed with issues, setting extraction_performed=True")
+            update_thinking_log("Extraction Issues", "Extraction completed with issues, setting extraction_performed=True", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
+            
             debug_logger.warning("Extraction completed with issues", data={
                 "results_count": len(extraction_results_list)
             }, context={"step": "extraction_with_issues"})
+            # st.rerun() # REMOVE/COMMENT OUT to keep cards visible (even on error)
 
-        # --- Card-based UI for Extracted Attributes ---
-        # (REMOVED 3. Enter Ground Truth & Evaluate and 4. View Raw Mistral Extraction UI sections)
-        import re
-        def strip_html_tags(text):
-            if not isinstance(text, str):
-                return text
-            clean = re.compile('<.*?>')
-            return re.sub(clean, '', text)
 
-        # --- Update CSS for compact cards ---
-        st.markdown(
-            """
-            <style>
-            .attribute-card {
-                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                border: 1.5px solid #1e3c72;
-                border-radius: 6px;
-                padding: 0.4rem 0.6rem 0.6rem 0.6rem;
-                min-width: 0;
-                width: 100%;
-                box-shadow: 0 2px 6px rgba(30, 60, 114, 0.07);
-                margin: 0 0 0.5rem 0;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .attribute-card h4 {
-                color: #1e3c72;
-                margin: 0 0 0.3rem 0;
-                font-size: 1em;
-                font-weight: 700;
-                border-bottom: 1px solid #1e3c72;
-                padding-bottom: 0.2rem;
-                width: 100%;
-            }
-            .attribute-value {
-                background: #fff;
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-                padding: 0.25rem 0.5rem;
-                margin: 0.1rem 0 0 0;
-                font-weight: 500;
-                font-size: 0.95em;
-                width: 100%;
-                box-sizing: border-box;
-            }
-            /* Remove extra margin between columns */
-            .element-container .stColumn > div {
-                /* Removed forced margin, revert to Streamlit default */
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
+    # --- Block 2: Display Ground Truth / Metrics (if results exist) ---
+    # This part needs the 'Source' column re-added for display
+    if st.session_state.evaluation_results:
+        debug_logger.info("Displaying evaluation results", data={
+            "results_count": len(st.session_state.evaluation_results)
+        }, context={"step": "display_results"})
+        
+        st.divider()
+        st.header("Extraction Results")
+
+        results_df = pd.DataFrame(st.session_state.evaluation_results)
+        
+        debug_logger.data_transformation(
+            "Results DataFrame creation",
+            st.session_state.evaluation_results,
+            results_df.to_dict('records'),
+            context={"step": "results_dataframe_created"}
         )
-        st.divider()
-        st.subheader("🗂️ Extracted Attributes (Compact Grid)")
-        # Display cards in a responsive grid: up to 4 per row, only name and value
-        results = [r for r in st.session_state.evaluation_results if isinstance(r, dict)]
+        
+        if 'Source' not in results_df.columns:
+             results_df['Source'] = 'Unknown' # Add placeholder if missing
+             debug_logger.warning("Source column missing, added placeholder", context={"step": "source_column_fixed"})
+
+
+
+        # --- CARD UI REPLACEMENT FOR GROUND TRUTH ---
         num_cols = 5
-        for i in range(0, len(results), num_cols):
-            row_results = results[i:i+num_cols]
-            cols = st.columns(min(len(row_results), num_cols))
-            for j, result in enumerate(row_results):
-                with cols[j]:
-                    attr_name = result.get('Prompt Name', 'Unknown Attribute')
-                    value = result.get('Extracted Value', '')
-                    st.markdown(f'''<div class=\"attribute-card\">
-                        <h4>{attr_name}</h4>
-                        <div class=\"attribute-value\">{value}</div>
-                    </div>''', unsafe_allow_html=True)
+        cards = st.session_state.evaluation_results
+        cols = st.columns(num_cols)
+        for idx, result in enumerate(cards):
+            with cols[idx % num_cols]:
+                prompt_name = result.get('Prompt Name', f'Field {idx+1}')
+                extracted_value = result.get('Extracted Value', '')
+                source = result.get('Source', '')
 
+                # Determine circle color
+                source_label = str(source).strip().lower()
+                if source_label == 'web':
+                    circle_color = '#28a745'  # green
+                elif source_label == 'numind':
+                    circle_color = '#007bff'  # blue
+                elif source_label == 'pdf':
+                    circle_color = '#ffc107'  # yellow
+                else:
+                    circle_color = '#6c757d'  # gray
+
+                st.markdown(f"""
+                <div class='result-item'>
+                    <div class='result-label'>🔍 {prompt_name}</div>
+                    <div class='result-value' title='{extracted_value}' style='position:relative; display:flex; align-items:center;'>
+                        <span style='flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>
+                            {extracted_value[:100] + ('...' if len(extracted_value) > 100 else '')}
+                        </span>
+                        <span style='position:absolute; right:8px; top:50%; transform:translateY(-50%); display:inline-block; width:14px; height:14px; border-radius:50%; background:{circle_color};'></span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        # --- END CARD UI REPLACEMENT ---
+        # --- Mini Debug Widget ---
+        
+        
+        # --- Manual Recheck Section ---
         st.divider()
-
-        # --- Main Extraction UI ---
-        if st.session_state.get("evaluation_results"):
-            # --- Manual Recheck Section ---
-            st.divider()
-            st.subheader("🔄 Manual Attribute Recheck")
+        st.subheader("🔄 Manual Attribute Recheck")
+        
+        # Help section
+        with st.expander("ℹ️ How to use Manual Recheck"):
+            st.markdown("""
+            **Manual Recheck allows you to re-extract specific attributes that may have been missed:**
             
-            with st.expander("ℹ️ How to use Manual Recheck"):
-                st.markdown("""
-                **Manual Recheck allows you to re-extract specific attributes that may have been missed:**
-                1. **Select attributes** from the dropdown below
-                2. **Click "Run Manual Recheck"** button
-                3. **Wait for results** - each attribute will be rechecked with enhanced prompts
-                4. **Review results** - successful extractions will show green checkmarks
-                **When to use:**
-                - Attributes that returned "NOT FOUND"
-                - Attributes that returned "none" (might be incorrect)
-                - Attributes with errors or unexpected formats
-                - Any attribute you suspect might have been missed
-                **What happens:**
-                - Uses more document chunks (15 instead of 8-12)
-                - Enhanced prompts specifically for rechecking
-                - Preserves original "none" values if recheck confirms they're correct
-                """)
-            manual_recheck_candidates = []
+            1. **Select attributes** from the dropdown below
+            2. **Click "Run Manual Recheck"** button
+            3. **Wait for results** - each attribute will be rechecked with enhanced prompts
+            4. **Review results** - successful extractions will show green checkmarks
+            
+            **When to use:**
+            - Attributes that returned "NOT FOUND"
+            - Attributes that returned "none" (might be incorrect)
+            - Attributes with errors or unexpected formats
+            - Any attribute you suspect might have been missed
+            
+            **What happens:**
+            - Uses more document chunks (15 instead of 8-12)
+            - Enhanced prompts specifically for rechecking
+            - Preserves original "none" values if recheck confirms they're correct
+            """)
+        
+        # Get attributes that might need manual recheck
+        # Now allow ALL attributes to be rechecked, not just failed ones
+        manual_recheck_candidates = []
+        for result in st.session_state.evaluation_results:
+            if isinstance(result, dict):
+                manual_recheck_candidates.append(result.get('Prompt Name', ''))
+        
+        if manual_recheck_candidates:
+            # Count "none" responses in manual recheck candidates (for info only)
+            none_candidates = []
+            other_candidates = []
             for result in st.session_state.evaluation_results:
-                if isinstance(result, dict):
-                    manual_recheck_candidates.append(result.get('Prompt Name', ''))
-            if manual_recheck_candidates:
-                none_candidates = []
-                other_candidates = []
-                for result in st.session_state.evaluation_results:
-                    if isinstance(result, dict) and result.get('Prompt Name') in manual_recheck_candidates:
-                        extracted_value = result.get('Extracted Value', '')
-                        if extracted_value and extracted_value.lower() in ["none", "null", "n/a", "na"]:
-                            none_candidates.append(result.get('Prompt Name'))
-                        else:
-                            other_candidates.append(result.get('Prompt Name'))
-                selected_for_recheck = st.multiselect(
-                    "Select attributes to recheck:",
-                    options=manual_recheck_candidates,
-                    default=manual_recheck_candidates[:3],
-                    help="Select any attribute to re-extract from the PDF using the RAG LLM. Useful for double-checking or improving any extraction, not just failed ones.",
-                    key="manual_recheck_multiselect"
-                )
-                part_number = st.session_state.get("part_number_input", "").strip()
-                # Use a unique key for the button
-                manual_recheck_clicked = st.button("🔄 Run Manual Recheck", type="primary", key="manual_recheck_button")
-                if selected_for_recheck and manual_recheck_clicked:
-                    st.info(f"Running manual recheck for {len(selected_for_recheck)} selected attributes...")
-                    # TODO: Implement the actual manual recheck logic here.
-                    # For now, just display a placeholder message and do not modify st.session_state.evaluation_results.
-                    st.warning("Manual recheck logic not yet implemented. Results will update here when available.")
-                elif not selected_for_recheck:
-                    st.info("Select at least one attribute to enable manual recheck.")
-                # Always display the last results from session state below
-            else:
-                st.success("All attributes have been successfully extracted! No manual recheck needed.")
-            # --- Export Section ---
-            st.divider()
-            st.header("6. Export Results")
-            if st.session_state.evaluation_results:
-                export_df = pd.DataFrame(st.session_state.evaluation_results)
-                export_summary = st.session_state.evaluation_metrics if st.session_state.evaluation_metrics else {}
-                @st.cache_data
-                def convert_df_to_csv(df):
-                    return df.to_csv(index=False).encode('utf-8')
-                csv_data = convert_df_to_csv(export_df)
-                json_summary_data = json.dumps(export_summary, indent=2).encode('utf-8')
-                export_cols = st.columns(2)
-                with export_cols[0]:
-                    st.download_button(
-                        label="📥 Download Detailed Results (CSV)",
-                        data=csv_data,
-                        file_name='detailed_extraction_results.csv',
-                        mime='text/csv',
-                        key='download_csv'
-                    )
-                with export_cols[1]:
-                    st.download_button(
-                        label="📥 Download Summary Metrics (JSON)",
-                        data=json_summary_data,
-                        file_name='evaluation_summary.json',
-                        mime='application/json',
-                        key='download_json'
-                    )
-            else:
-                st.info("Process documents and calculate metrics to enable export.")
+                if isinstance(result, dict) and result.get('Prompt Name') in manual_recheck_candidates:
+                    extracted_value = result.get('Extracted Value', '')
+                    if extracted_value and extracted_value.lower() in ["none", "null", "n/a", "na"]:
+                        none_candidates.append(result.get('Prompt Name'))
+                    else:
+                        other_candidates.append(result.get('Prompt Name'))
+            
+           
+            
+            # Allow user to select specific attributes for recheck
+            selected_for_recheck = st.multiselect(
+                "Select attributes to recheck:",
+                options=manual_recheck_candidates,
+                default=manual_recheck_candidates[:3],  # Default to first 3
+                help="Select any attribute to re-extract from the PDF using the RAG LLM. Useful for double-checking or improving any extraction, not just failed ones."
+            )
+            
+            # --- Ensure part_number is defined for manual recheck ---
+            part_number = st.session_state.get("part_number_input", "").strip()
+            
+            if selected_for_recheck and st.button("🔄 Run Manual Recheck", type="primary"):
+
+                update_thinking_log("Manual Recheck Start", f"Running manual recheck for {len(selected_for_recheck)} selected attributes...", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
+                
+                # Run manual recheck
+                for prompt_name in selected_for_recheck:
+                    attribute_key = prompt_name
+                    pdf_instruction = prompts_to_run[attribute_key]["pdf"]
+                    
+                    with st.spinner(f"Manual recheck for {attribute_key}..."):
+                        try:
+                            start_time = time.time()
+                            
+                            # Use even more chunks for manual recheck
+                            context_chunks = fetch_chunks(
+                                st.session_state.retriever,
+                                part_number,
+                                attribute_key,
+                                k=15  # Increased for thorough manual recheck
+                            )
+                            context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
+                            
+                            # Enhanced prompt for manual recheck
+                            # Check if this attribute previously returned "none" or similar
+                            previous_value = None
+                            for result in st.session_state.evaluation_results:
+                                if result.get('Prompt Name') == prompt_name:
+                                    previous_value = result.get('Extracted Value', '')
+                                    break
+                            
+                            # Customize manual recheck prompt based on previous result
+                            if previous_value and previous_value.lower() in ["none", "null", "n/a", "na"]:
+                                manual_instruction = f"{pdf_instruction}\n\nMANUAL RECHECK - CRITICAL: Previous extraction returned '{previous_value}'. This may be incorrect. Please be extremely thorough and look for ANY mention of this attribute, even if it's not explicitly labeled. Consider technical specifications, material properties, dimensions, or any related information that might indicate this attribute's value. This is a manual recheck request - be exhaustive in your search."
+                            else:
+                                manual_instruction = f"{pdf_instruction}\n\nMANUAL RECHECK: This is a manual recheck request. Please be extremely thorough and consider all possible interpretations. Look for any mention, even indirect, of this attribute in the document context."
+                            
+                            manual_recheck_input = {
+                                "context": context_text,
+                                "extraction_instructions": manual_instruction,
+                                "attribute_key": attribute_key,
+                                "part_number": part_number if part_number else "Not Provided"
+                            }
+                            
+                            json_result_str = loop.run_until_complete(
+                                _invoke_chain_and_process(st.session_state.pdf_chain, manual_recheck_input, f"{attribute_key} (Manual Recheck)")
+                            )
+                            run_time = time.time() - start_time
+                            
+                            # Parse result
+                            final_answer_value = "Error"
+                            parse_error = None
+                            raw_output = json_result_str if json_result_str else '{"error": "Manual recheck did not run"}'
+                            
+                            try:
+                                string_to_parse = raw_output.strip()
+                                parsed_json = extract_json_from_string(string_to_parse)
+                                
+                                if isinstance(parsed_json, dict) and attribute_key in parsed_json:
+                                    parsed_value = str(parsed_json[attribute_key])
+                                    if (parsed_value.strip() == "" or 
+                                        "not found" in parsed_value.lower() or
+                                        parsed_value.lower() in ["none", "null", "n/a", "na"]):
+                                        final_answer_value = "NOT FOUND (Manual)"
+                                    else:
+                                        final_answer_value = parsed_value
+                                        st.success(f"Manual recheck successful for '{attribute_key}': {parsed_value}")
+                                elif isinstance(parsed_json, dict) and "error" in parsed_json:
+                                    final_answer_value = f"Error: {parsed_json['error'][:100]}"
+                                    parse_error = ValueError(f"Manual Recheck Error: {parsed_json['error']}")
+                                else:
+                                    final_answer_value = "Unexpected JSON Format (Manual)"
+                                    parse_error = ValueError(f"Manual Recheck Unexpected JSON format")
+                                    
+                            except Exception as processing_exc:
+                                parse_error = processing_exc
+                                final_answer_value = "Processing Error (Manual)"
+                            
+                            # Update the result
+                            for i, result in enumerate(st.session_state.evaluation_results):
+                                if result.get('Prompt Name') == prompt_name:
+                                    previous_latency = result.get('Latency (s)', 0.0)
+                                    total_latency = previous_latency + round(run_time, 2)
+                                    
+                                    # Check if we should preserve the original value (rollback logic)
+                                    original_value = result.get('Extracted Value', '')
+                                    original_source = result.get('Source', 'Unknown')
+                                    
+                                    # Rollback conditions: preserve original value if manual recheck failed
+                                    should_rollback = (
+                                        # Preserve "none" values when confirmed by recheck
+                                        (original_value.lower() in ["none", "null", "n/a", "na"] and final_answer_value == "NOT FOUND (Manual)") or
+                                        # Rollback to original when manual recheck has errors
+                                        bool(parse_error) or
+                                        final_answer_value in ["Error", "Processing Error (Manual)", "Unexpected JSON Format (Manual)"]
+                                    )
+                                    
+                                    # Determine final value
+                                    if should_rollback:
+                                        final_display_value = original_value  # Keep original value
+                                        final_source = original_source  # Keep original source
+                                        is_success = result.get('Is Success', False)  # Keep original success status
+                                        is_not_found = result.get('Is Not Found', False)  # Keep original not found status
+                                        is_error = result.get('Is Error', False)  # Keep original error status
+                                    else:
+                                        final_display_value = final_answer_value
+                                        final_source = 'Manual Recheck'
+                                        is_success = not bool(parse_error) and final_answer_value not in ["NOT FOUND (Manual)", "Error", "Processing Error (Manual)", "Unexpected JSON Format (Manual)"]
+                                        is_not_found = final_answer_value in ["NOT FOUND (Manual)"]
+                                        is_error = bool(parse_error)
+                                    
+                                    st.session_state.evaluation_results[i].update({
+                                        'Extracted Value': final_display_value,
+                                        'Source': final_source,
+                                        'Raw Output': raw_output if not should_rollback else result.get('Raw Output', raw_output),
+                                        'Parse Error': str(parse_error) if parse_error and not should_rollback else result.get('Parse Error'),
+                                        'Is Success': is_success,
+                                        'Is Error': is_error,
+                                        'Is Not Found': is_not_found,
+                                        'Is Rate Limit': False,
+                                        'Latency (s)': total_latency
+                                    })
+                                    
+                                    # Show feedback for rollback
+                                    if should_rollback and bool(parse_error):
+                                        st.warning(f"⚠️ Rolled back to original '{original_value}' for '{attribute_key}' (manual recheck error)")
+                                    elif should_rollback and original_value.lower() in ["none", "null", "n/a", "na"]:
+
+                                        update_thinking_log(f"Manual Recheck Preserved {attribute_key}", f"✅ Preserved original '{original_value}' for '{attribute_key}' (confirmed by manual recheck)", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
+                                    break
+                            
+                            time.sleep(0.5)  # Brief delay between manual rechecks
+                            
+                        except Exception as e:
+                            st.error(f"Error during manual recheck for '{attribute_key}': {e}")
+                            logger.error(f"Manual recheck failed for '{attribute_key}': {e}", exc_info=True)
+                
+                st.success("Manual recheck completed!")
+                st.rerun()  # Refresh to show updated results
         else:
-            st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
+            st.success("All attributes have been successfully extracted! No manual recheck needed.")
+
+       
+
+        # --- Export Section --- 
+        st.divider()
+        st.header("Export Results")
+
+        if st.session_state.evaluation_results:
+            # Prepare data for export
+            export_df = pd.DataFrame(st.session_state.evaluation_results)
+            export_summary = st.session_state.evaluation_metrics if st.session_state.evaluation_metrics else {}
+
+            # Convert DataFrame to CSV
+            @st.cache_data # Cache the conversion
+            def convert_df_to_csv(df):
+                return df.to_csv(index=False).encode('utf-8')
+
+            csv_data = convert_df_to_csv(export_df)
+
+            export_cols = st.columns(2)
+            with export_cols[0]:
+                st.download_button(
+                    label="📥 Download Detailed Results (CSV)",
+                    data=csv_data,
+                    file_name='detailed_extraction_results.csv',
+                    mime='text/csv',
+                    key='download_csv'
+                )
+        else:
+            update_thinking_log("Export Instructions", "Process documents and calculate metrics to enable export.", is_active=True, reset_time=False, placeholder=st.session_state['log_placeholder'])
 
     # --- Block 3: Handle cases where extraction ran but yielded nothing, or hasn't run ---
     # This logic might need review depending on how Stage 1/2 errors are handled
     elif (st.session_state.pdf_chain or st.session_state.web_chain) and st.session_state.extraction_performed:
         st.warning("Extraction process completed, but no valid results were generated for some fields. Check logs or raw outputs if available.")
 
-
+    
     
