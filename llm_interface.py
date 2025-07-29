@@ -4,19 +4,15 @@ from typing import List, Dict, Optional
 from loguru import logger
 from langchain.vectorstores.base import VectorStoreRetriever
 from langchain.docstore.document import Document
-
-# Recommended: Use LangChain's Groq integration
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from langchain_core.output_parsers import StrOutputParser
-
-import config # Import configuration
-import asyncio # Need asyncio for crawl4ai
+import config 
+import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-from bs4 import BeautifulSoup # Import BeautifulSoup
-
+from bs4 import BeautifulSoup 
 import hashlib
 import datetime
 import os
