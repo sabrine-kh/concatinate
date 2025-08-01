@@ -91,7 +91,7 @@ def format_docs(docs: List[Document]) -> str:   # Cette fonction prend une liste
     for i, doc in enumerate(docs):
         source = doc.metadata.get('source', 'Unknown')
         page = doc.metadata.get('page', 'N/A')
-        context_parts.append(  ,#formatage de chaîne)
+        context_parts.append(  ,)#formatage de chaîne
             f"Document {i+1} from '{source}' (Page {page}):\n{doc.page_content}"
         )
     return "\n\n---\n\n".join(context_parts)
