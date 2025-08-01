@@ -23,7 +23,7 @@ np.random.seed(42)
 class HuggingFaceAPIEmbeddings(Embeddings):
     """Custom embeddings class that uses Hugging Face API instead of local model."""
     
-    def __init__(self, api_url: str = "https://hbaananou-embedder-model.hf.space/embed"):
+    def __init__(self, api_url: str = "https://sabrinekh/embedder_model.hf.space/embed"):
         self.api_url = api_url
         logger.info(f"Initialized HuggingFace API embeddings with URL: {api_url}")
     

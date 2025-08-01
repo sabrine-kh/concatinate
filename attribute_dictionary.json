@@ -21,6 +21,5 @@
     "Colour Coding": ["None", "Red", "Blue", "Orange", "Natural", "Black", "Pink", "White", "Violet"],
     "Set/Kit": ["No", "Yes"],
     "Name Of Closed Cavities": ["none", "2,3", "4-7,14-17", "4-5,10,14-15,17,19"],
-    "Pull-To-Seat": ["No", "Yes"],
-    "Classification": ["LEONI Part/Interconnection/Connector"]
+    "Pull-To-Seat": ["No", "Yes"]
 } 
