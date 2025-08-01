@@ -204,7 +204,7 @@ def get_embedding_function():
     use_api_embeddings = os.getenv("USE_API_EMBEDDINGS", "true").lower() == "true"
     
     if use_api_embeddings:
-        api_url = os.getenv("EMBEDDING_API_URL", "https://hbaananou-embedder-model.hf.space/embed")
+        api_url = os.getenv("EMBEDDING_API_URL", "https://sabrinekh/embedder_model.hf.space/embed")
         logger.info(f"Using HuggingFace API embeddings: {api_url}")
         return HuggingFaceAPIEmbeddings(api_url=api_url)
     else:
