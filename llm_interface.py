@@ -1,29 +1,25 @@
+
 import json
 from typing import List, Dict, Optional
-from loguru import logger #bibliothèque pour afficher des messages  
-from langchain.vectorstores.base import VectorStoreRetriever  #retrouver des parties similaires à une requête
+from loguru import logger
+from langchain.vectorstores.base import VectorStoreRetriever #retrouver des parties similaires à une requête
 from langchain.docstore.document import Document
 from langchain_groq import ChatGroq
-from langchain.prompts import PromptTemplate  #Permet de créer des modèles de prompt (questions ou instructions) 
-from langchain_core.runnables import RunnablePassthrough, RunnableParallel #Permettent de composer des chaînes d’opérations
-from langchain_core.output_parsers import StrOutputParser #ransforme la sortie du LLM en chaîne de caractères exploitable.
-import config 
-import asyncio #Permet d’exécuter des fonctions asynchrones (par exemple, pour le web scraping sans bloquer le programme).
+from langchain.prompts import PromptTemplate #Permet de créer des modèles de prompt (questions ou instructions) 
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel#Permettent de composer des chaînes d’opérations
+from langchain_core.output_parsers import StrOutputParser#ransforme la sortie du LLM en chaîne de caractères exploitable.
+import config # Import configuration
+import asyncio # #Permet d’exécuter des fonctions asynchrones (par exemple, pour le web scraping sans bloquer le programme).
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 # Outil pour naviguer et extraire des données de pages web de façon asynchrone.
 # Paramètres pour configurer le comportement du crawler
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-#Stratégie pour extraire des éléments HTML via des sélecteurs CSS et les structurer en JSON.
 from bs4 import BeautifulSoup #Bibliothèque pour parser et manipuler du HTML 
-import hashlib# Pour créer des empreintes (hash) de textes (pour chaque partie de texte we created an identity)
-# Pour identifier de manière unique chaque "chunk" (morceau de document) et éviter les doublons.
-import datetime #Pour manipuler les dates et heures 
-import os #Pour interagir avec le système de fichiers (chemins, ouverture de fichiers,)
+import os#Pour interagir avec le système de fichiers (chemins, ouverture de fichiers,)
 # Permet de trouver automatiquement les fichiers de configuration, peu importe où le programme est exécuté
-from typing import Dict, Any, Optional
 
-RETRIEVED_CHUNKS_LOG = os.path.join(os.path.dirname(__file__), 'retrieved_chunks_log.jsonl')
 
+# Load attribute dictionary
 def load_attribute_dictionary():
     """Load the attribute dictionary from JSON file."""
     try:
@@ -34,183 +30,45 @@ def load_attribute_dictionary():
         logger.error(f"Failed to load attribute dictionary: {e}")
         return {}
 
-ATTRIBUTE_DICT = load_attribute_dictionary() #Variable globale qui contient le dictionnaire d'attributs chargé
+# Load the attribute dictionary
+ATTRIBUTE_DICT = load_attribute_dictionary()
 
-def _hash_chunk(chunk):  # "_" fonction "privée
-    # Hash chunk content and metadata for reproducibility
-    m = hashlib.sha256()
-    m.update(chunk.page_content.encode('utf-8'))#Crée un objet hash SHA-256
-    m.update(json.dumps(chunk.metadata, sort_keys=True).encode('utf-8'))#Ajoute le contenu du chunk au hash (converti en bytes UTF-8)
-    return m.hexdigest()#Retourne l'identifiant unique en format hexadécimal
-
-def _log_retrieved_chunks(attribute_key, query, chunks):  #Fonction privée qui enregistre les chunks récupérés
-    # Store a record of retrieved chunks for this attribute and query
-    record = {
-        'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
-        'attribute_key': attribute_key,
-        'query': query,
-        'chunk_hashes': [_hash_chunk(chunk) for chunk in chunks],
-        'chunk_metadata': [chunk.metadata for chunk in chunks],
-        'num_chunks': len(chunks)
-    }
-    with open(RETRIEVED_CHUNKS_LOG, 'a', encoding='utf-8') as f:  # Écriture dans le fichier de log
-        f.write(json.dumps(record) + '\n')
-
-# --- Initialize LLM ---
+# --- LLM Initialization ---
 @logger.catch(reraise=True) # Keep catch for unexpected errors during init
 def initialize_llm():
-    """Initializes and returns the Groq LLM client. No internal logging."""
-    if not config.GROQ_API_KEY:
-        # logger.error("GROQ_API_KEY not found.") # Remove internal logging
-        raise ValueError("GROQ_API_KEY is not set in the environment variables.")
-
+    """
+    Initialize the LLM client with proper error handling and fallback.
+    Returns the initialized LangChain Groq LLM or None if initialization fails.
+    """
     try:
-        llm = ChatGroq(
-            temperature=0.0,    #très déterministe (même réponse pour même question)
-            top_p=1.0,                 # leave at 1 for greedy decoding( pas de filtrage, toutes les options sont possibles.)
-            groq_api_key=config.GROQ_API_KEY,
-            model_name=config.LLM_MODEL_NAME,
-            max_tokens=config.LLM_MAX_OUTPUT_TOKENS,
-            frequency_penalty=0.0,   #Pas de pénalité pour la répétition de mots
-            presence_penalty=0.0,   #Pas de pénalité pour l'apparition de nouveaux sujets
-            seed=42                    # optional but guarantees replayability ,( obtiens toujours la même réponse si tu relances le code.)
-        )
-        # logger.info(f"Groq LLM initialized with model: {config.LLM_MODEL_NAME}") # Remove internal logging
-        return llm
-    except Exception as e:
-        # logger.error(f"Failed to initialize Groq LLM: {e}") # Remove internal logging
-        # Re-raise a more specific error if needed, or let @logger.catch handle it
-        raise ConnectionError(f"Could not initialize Groq LLM: {e}")
 
-# --- Option 1: Using LangChain's Groq Integration (Recommended) ---
-
-def format_docs(docs: List[Document]) -> str:   # Cette fonction prend une liste de documents ( chunks pertinentes) et les formate en une seule chaîne de texte pour input de llm . /Le LLM sait d'où vient chaque information
-    """Formats retrieved documents into a string for the prompt."""
-    # Keep detailed formatting as it might help LLM locate info in PDFs
-    context_parts = []
-    for i, doc in enumerate(docs):
-        source = doc.metadata.get('source', 'Unknown')
-        page = doc.metadata.get('page', 'N/A')
-        context_parts.append(   #formatage de chaîne
-            f"Document {i+1} from '{source}' (Page {page}):\n{doc.page_content}"
-        )
-    return "\n\n---\n\n".join(context_parts)
-
-def create_enhanced_search_queries(attribute_key: str, base_query: str) -> list: #Crée des requêtes de recherche améliorées en utilisant les valeurs du dictionnaire et les synonymes.
-    """Create enhanced search queries using dictionary values and synonyms."""
-    queries = [base_query]  # Always include the original query
-    
-    # Get dictionary values for this attribute
-    dict_values = ATTRIBUTE_DICT.get(attribute_key, [])
-    # Create attribute-specific search terms
-    attribute_terms = {
-        "Material Filling": ["filling", "additive", "filler", "glass fiber", "GF", "GB", "MF", "talcum"],
-        "Material Name": ["material", "polymer", "PA", "PBT", "PP", "PET", "PC", "silicone", "rubber"],
-        "Pull-To-Seat": ["pull to seat", "pull-back", "tug-lock", "terminal insertion", "seating"],
-        "Gender": ["gender", "male", "female", "plug", "receptacle", "socket", "header"],
-        "Height [MM]": ["height", "Y-axis", "total height", "thickness"],
-        "Length [MM]": ["length", "Z-axis", "depth", "insertion depth"],
-        "Width [MM]": ["width", "X-axis", "diameter"],
-        "Number Of Cavities": ["cavity", "position", "way", "pin count", "terminal count"],
-        "Number Of Rows": ["row", "grid", "arrangement", "layout"],
-        "Mechanical Coding": ["coding", "keying", "polarization", "mechanical key"],
-        "Colour": ["color", "colour", "black", "white", "red", "blue", "yellow"],
-        "Colour Coding": ["color coding", "colour coding", "coded components"],
-        "Working Temperature": ["temperature", "thermal", "operating temp", "min temp", "max temp"],
-        "Housing Seal": ["seal", "sealing", "radial seal", "interface seal", "ring seal"],
-        "Wire Seal": ["wire seal", "individual seal", "mat seal", "gel seal"],
-        "Sealing": ["sealing", "waterproof", "dustproof", "IP rating"],
-        "Sealing Class": ["IP", "ingress protection", "IPx0", "IPx4", "IPx6", "IPx7"],
-        "Contact Systems": ["contact system", "terminal system", "MQS", "MCP", "TAB", "MLK"],
-        "Terminal Position Assurance": ["TPA", "terminal position assurance", "anti-backout"],
-        "Connector Position Assurance": ["CPA", "connector position assurance", "secondary lock"],
-        "Name Of Closed Cavities": ["closed cavity", "blocked position", "plugged cavity"],
-        "Pre-assembled": ["pre-assembled", "assembly", "disassembly", "delivered as"],
-        "Type Of Connector": ["connector type", "standard", "antenna", "relay holder", "bulb holder"],
-        "Set/Kit": ["set", "kit", "accessories", "components"],
-        "HV Qualified": ["HV", "high voltage", "voltage", "qualified", "certified"]
-    }## Le système essaiera chaque requête pour trouver le maximum d'informations pertinentes
-    
-    # Add attribute-specific terms
-    if attribute_key in attribute_terms:# ajouter les termes spécifiques à l'attribut.
-        queries.extend(attribute_terms[attribute_key]) # ajoute tous les éléments de la liste à queries
-    
-    # Add dictionary values as search terms (for better matching)
-    for value in dict_values[:10]:  # Limit to first 10 values to avoid too many queries
-        if isinstance(value, str) and len(value) > 1: #vérifie que c'est une chaîne de caractères
-            queries.append(value)
-    
-    # Create combined queries using base query + dictionary values
-    if dict_values:
-        for value in dict_values[:5]:  # Use top 5 dictionary values
-            if isinstance(value, str) and len(value) > 1:
-                combined_query = f"{base_query} {value}"
-                queries.append(combined_query)
-    
-    # Remove duplicates and limit total queries
-    unique_queries = list(dict.fromkeys(queries))[:20]  # Incr eased to 20 queries
-    return unique_queries
-
-def retrieve_and_log_chunks(retriever, query: str, attribute_key: str):
-    """Retrieves chunks from the retriever using enhanced search queries and logs them for debugging."""
-    logger.info(f"🔍 RETRIEVING CHUNKS for attribute '{attribute_key}' with base query: '{query}'")
-    
-    # Create enhanced search queries
-    enhanced_queries = create_enhanced_search_queries(attribute_key, query)
-    logger.info(f"📋 Using {len(enhanced_queries)} enhanced search queries: {enhanced_queries[:5]}...")
-    
-    all_chunks = []
-    seen_chunks = set()  # Track unique chunks by content hash
-    
-    try:
-        # Try each enhanced query
-        for i, search_query in enumerate(enhanced_queries):
-            logger.debug(f"🔍 Search {i+1}/{len(enhanced_queries)}: '{search_query}'")
+        
+        if not config.GROQ_API_KEY:
+            logger.error("GROQ_API_KEY not found in environment variables.")
+            return None
             
-            try:
-                chunks = retriever.invoke(search_query)
-                
-                if chunks:
-                    # Add unique chunks only
-                    for chunk in chunks:
-                        chunk_hash = _hash_chunk(chunk)
-                        if chunk_hash not in seen_chunks:
-                            seen_chunks.add(chunk_hash)
-                            all_chunks.append(chunk)
-                            logger.debug(f"  ✅ Added unique chunk from query '{search_query}'")
-                
-            except Exception as e:
-                logger.warning(f"❌ Query '{search_query}' failed: {e}")
-                continue
+        llm = ChatGroq(
+            api_key=config.GROQ_API_KEY,
+            model_name=config.LLM_MODEL_NAME,
+            temperature=config.LLM_TEMPERATURE,
+            max_tokens=config.LLM_MAX_OUTPUT_TOKENS
+        )
+        logger.info("LangChain Groq LLM initialized successfully.")
+        return llm
         
-        # Limit total chunks to avoid overwhelming the LLM
-        max_chunks = 10
-        if len(all_chunks) > max_chunks:
-            logger.info(f"📊 Limiting chunks from {len(all_chunks)} to {max_chunks}")
-            all_chunks = all_chunks[:max_chunks]
-        
-        if not all_chunks:
-            logger.warning(f"❌ No chunks retrieved for attribute '{attribute_key}' after trying {len(enhanced_queries)} queries")
-            _log_retrieved_chunks(attribute_key, query, [])
-            return []
-        
-        logger.info(f"✅ Retrieved {len(all_chunks)} unique chunks for attribute '{attribute_key}' from {len(enhanced_queries)} queries:")
-        
-        for i, chunk in enumerate(all_chunks):
-            source = chunk.metadata.get('source', 'Unknown')
-            page = chunk.metadata.get('page', 'N/A')
-            start_index = chunk.metadata.get('start_index', 'N/A')
-            logger.info(f"  📄 Chunk {i+1}: Source='{source}', Page={page}, StartIndex={start_index}")
-            logger.info(f"     Content: {chunk.page_content[:200]}{'...' if len(chunk.page_content) > 200 else ''}")
-        
-        _log_retrieved_chunks(attribute_key, query, all_chunks)
-        
-        return all_chunks
-        
+    except ImportError:
+        logger.error("LangChain Groq library not installed. Install with: pip install langchain-groq")
+        return None
     except Exception as e:
-        logger.error(f"❌ Error in enhanced retrieval for attribute '{attribute_key}': {e}")
-        _log_retrieved_chunks(attribute_key, query, [])
-        return []
+        logger.error(f"Failed to initialize LangChain Groq LLM: {e}")
+        return None
+
+# --- Document Formatting ---
+def format_docs(docs: List[Document]) -> str:
+    """Format a list of documents into a single string."""
+    return "\n\n".join([doc.page_content for doc in docs])
+
+# --- Website Scraping Functions ---
 
 # Configure websites to scrape, in order of preference.
 # We now target the main table/container holding the product features.
@@ -438,10 +296,15 @@ Output:
 """
     prompt = PromptTemplate.from_template(template)
 
-    # Chain uses retriever to get PDF context based on extraction instructions
+    # Chain uses SimpleRetriever to get PDF context based on extraction instructions
     pdf_chain = (
         RunnableParallel(
-            context=lambda x: format_docs(retrieve_and_log_chunks(retriever, x['extraction_instructions'], x['attribute_key'])),
+            context=lambda x: format_docs(retriever.retrieve(
+                query=x['extraction_instructions'],
+                attribute_key=x['attribute_key'],
+                part_number=x.get('part_number'),
+                max_queries=3
+            )),
             extraction_instructions=lambda x: x['extraction_instructions'],
             attribute_key=lambda x: x['attribute_key'],
             part_number=lambda x: x.get('part_number', "Not Provided"),
@@ -508,6 +371,8 @@ Output:
 
 
 # --- NuMind Integration for Structured Extraction ---
+import os
+from typing import Dict, Any, Optional
 
 # NuMind configuration
 NUMIND_API_KEY = os.getenv("NUMIND_API_KEY", "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJkVWRIUGZnUlk3NzBiMHNvZlRFUWlWU2MyMW9kRENRbmcxZE5ZZjR2b1dBIn0.eyJleHAiOjE3ODM2MjA5NTksImlhdCI6MTc1MjA5MDU0MiwiYXV0aF90aW1lIjoxNzUyMDg0OTU5LCJqdGkiOiJiNzIzYzc1MS00MWUyLTRmNTMtODYzMC1kNjU3NzE1YzMxMGEiLCJpc3MiOiJodHRwczovL3VzZXJzLm51bWluZC5haS9yZWFsbXMvZXh0cmFjdC1wbGF0Zm9ybSIsImF1ZCI6WyJhY2NvdW50IiwiYXBpIl0sInN1YiI6IjNlOTEyNTlhLWVkZGEtNDc0YS04ZWZhLWZlOWMzYzg2NjcxOSIsInR5cCI6IkJlYXJlciIsImF6cCI6InVzZXIiLCJzaWQiOiIwOTA3NDE5ZC1lM2Y1LTRlOTctOWMxZi00ZmVlMGE4M2Q5MjUiLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbIi8qIl0sInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIiwiZGVmYXVsdC1yb2xlcy1leHRyYWN0LXBsYXRmb3JtIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJvcmdhbml6YXRpb25zIjp7fSwibmFtZSI6IkhhbWRpIEJhYW5hbm91IiwiY2xpZW50IjoiYXBpIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiYmFhbmFub3Vjb250YWN0QGdtYWlsLmNvbSIsImdpdmVuX25hbWUiOiJIYW1kaSIsImZhbWlseV9uYW1lIjoiQmFhbmFub3UiLCJlbWFpbCI6ImJhYW5hbm91Y29udGFjdEBnbWFpbC5jb20ifQ.DSAc5gkuzR8Kip40QFA32pVRYfmn7dzCNHcEZUIryI5n1z2U5m5gQ70qRH4brwgwuzEiUnn3TgJ0gALAbjNRU1V4K-KICPBny_eNmm2UhQBEUHqUqyjPbIjYZD6K4-gcBbdMoZzSNpFaSmYfZBK1xt4QDmXrKkLhumm8cJ5P_sphtRpYHhQ6CmAorfRQ4Bzg2jaYc20Pu4-Vqn2uxtGEG_KOW2wkwUPcDfGY0cx1H5oTFk7P4o1u6w8tzvMcjgf510cTgyk0rtYnPY8UguORuoY35D0cCTygWUhXZSHkEOSsSEs8MlR6wXn5EQ_4Ht1ZM5vjFRfWOdJO4zP0pd6Yxw")
@@ -817,7 +682,7 @@ async def _invoke_chain_and_process(chain, input_data, attribute_key):
         context_value = input_data['context'] if isinstance(input_data['context'], str) else str(input_data['context'])
     elif 'cleaned_web_data' in input_data:
         context_type = 'Web'
-        context_value = input_data['cleaned_web_data'] if isinstance(input_data['cleaned_web_data'], str) else str(input_data['cleaned_web_data'])#Vérifie si la réponse N'EST PAS une string 
+        context_value = input_data['cleaned_web_data'] if isinstance(input_data['cleaned_web_data'], str) else str(input_data['cleaned_web_data'])
     if 'extraction_instructions' in input_data:
         extraction_instructions = input_data['extraction_instructions'] if isinstance(input_data['extraction_instructions'], str) else str(input_data['extraction_instructions'])
     logger.debug(f"CHUNK SENT TO LLM ({context_type}):\nContext: {context_value[:1000]}\n---\nExtraction Instructions: {extraction_instructions}\n---\nAttribute Key: {attribute_key}")

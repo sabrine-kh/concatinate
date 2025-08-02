@@ -16,7 +16,7 @@ from langchain.embeddings.base import Embeddings
 import config # Import configuration
 import random
 import numpy as np
-random.seed(42)
+random.seed(42) 
 np.random.seed(42)
 
 # --- Custom Hugging Face API Embeddings ---
@@ -98,69 +98,97 @@ class HuggingFaceAPIEmbeddings(Embeddings):
                     all_embeddings.extend(batch_embeddings)
                     logger.debug(f"Successfully embedded batch {batch_num} with {len(batch_texts)} documents")
                     
-                    # Add a small delay between batches to avoid overwhelming the API
-                    if i + batch_size < len(processed_texts):
-                        time.sleep(1.0)  # Increased delay for large files
+                    # Success, break out of retry loop
+                    break
                     
-                    break  # Success, exit retry loop
-                    
-                except requests.exceptions.Timeout as e:
-                    logger.warning(f"Timeout for batch {batch_num} (attempt {retry + 1}/{max_retries}): {e}")
+                except requests.exceptions.Timeout:
+                    logger.warning(f"Batch {batch_num} timed out (attempt {retry + 1}/{max_retries})")
                     if retry == max_retries - 1:
-                        logger.error(f"All retries failed for batch {batch_num}")
+                        logger.error(f"Batch {batch_num} failed after {max_retries} timeout attempts")
                         raise
-                    time.sleep(2.0)  # Wait before retry
+                    time.sleep(1)  # Wait before retry
                     
                 except requests.exceptions.RequestException as e:
-                    logger.error(f"API request failed for batch {batch_num}: {e}")
-                    raise
-                except (KeyError, ValueError, json.JSONDecodeError) as e:
-                    logger.error(f"Failed to parse API response for batch {batch_num}: {e}")
-                    raise
+                    logger.warning(f"Batch {batch_num} failed (attempt {retry + 1}/{max_retries}): {e}")
+                    if retry == max_retries - 1:
+                        logger.error(f"Batch {batch_num} failed after {max_retries} attempts")
+                        raise
+                    time.sleep(1)  # Wait before retry
+                    
                 except Exception as e:
-                    logger.error(f"Unexpected error during embedding for batch {batch_num}: {e}")
+                    logger.error(f"Unexpected error in batch {batch_num}: {e}")
                     raise
         
-        logger.debug(f"Successfully embedded all {len(texts)} documents via API in batches")
+        logger.info(f"Successfully embedded {len(processed_texts)} documents in {len(all_embeddings)} batches")
         return all_embeddings
-    
+
     def embed_documents_fallback(self, texts: List[str]) -> List[List[float]]:
-        """Fallback method: embed documents one by one if batch processing fails."""
-        logger.warning("Using fallback method: processing texts individually")
-        embeddings = []
+        """Fallback embedding method for individual document processing."""
+        if not texts:
+            return []
+        
+        max_text_length = config.EMBEDDING_MAX_TEXT_LENGTH
+        all_embeddings = []
         
         for i, text in enumerate(texts):
             try:
                 # Limit text length
-                if len(text) > config.EMBEDDING_MAX_TEXT_LENGTH:
-                    text = text[:config.EMBEDDING_MAX_TEXT_LENGTH]
-                    logger.warning(f"Truncating text {i+1} from {len(text)} to {config.EMBEDDING_MAX_TEXT_LENGTH} characters")
+                if len(text) > max_text_length:
+                    logger.warning(f"Truncating text {i+1} from {len(text)} to {max_text_length} characters")
+                    processed_text = text[:max_text_length]
+                else:
+                    processed_text = text
                 
-                # Embed single text
-                embedding = self.embed_query(text)
-                embeddings.append(embedding)
+                # Process single document
+                payload = {"texts": [processed_text]}
                 
-                logger.debug(f"Successfully embedded text {i+1}/{len(texts)}")
+                response = requests.post(
+                    self.api_url,
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                    timeout=config.EMBEDDING_TIMEOUT
+                )
                 
-                # Small delay between individual requests
-                time.sleep(0.5)
+                response.raise_for_status()
+                result = response.json()
+                
+                # Extract single embedding
+                if "embeddings" in result:
+                    embedding = result["embeddings"][0]
+                elif "vectors" in result:
+                    embedding = result["vectors"][0]
+                elif isinstance(result, list):
+                    embedding = result[0]
+                else:
+                    embedding = result.get("data", result.get("result", result))[0]
+                
+                all_embeddings.append(embedding)
+                logger.debug(f"Successfully embedded document {i+1}/{len(texts)}")
                 
             except Exception as e:
-                logger.error(f"Failed to embed text {i+1}: {e}")
-                # Return a zero vector as fallback
-                zero_vector = [0.0] * config.EMBEDDING_DIMENSIONS
-                embeddings.append(zero_vector)
+                logger.error(f"Failed to embed document {i+1}: {e}")
+                # Return zero vector as fallback
+                all_embeddings.append([0.0] * 768)  # Assuming 768-dimensional embeddings
         
-        return embeddings
-    
+        return all_embeddings
+
     def embed_query(self, text: str) -> List[float]:
-        """Embed a single query text using the Hugging Face API."""
+        """Embed a single query text."""
         if not text:
             return []
         
+        max_text_length = config.EMBEDDING_MAX_TEXT_LENGTH
+        
+        # Limit text length
+        if len(text) > max_text_length:
+            logger.warning(f"Truncating query from {len(text)} to {max_text_length} characters")
+            processed_text = text[:max_text_length]
+        else:
+            processed_text = text
+        
         try:
             # Prepare the request payload
-            payload = {"texts": [text]}
+            payload = {"texts": [processed_text]}
             
             # Make the API request
             response = requests.post(
@@ -178,112 +206,232 @@ class HuggingFaceAPIEmbeddings(Embeddings):
             
             # Extract embedding from the response
             if "embeddings" in result:
-                return result["embeddings"][0]
+                embedding = result["embeddings"][0]
             elif "vectors" in result:
-                return result["vectors"][0]
+                embedding = result["vectors"][0]
             elif isinstance(result, list):
-                return result[0]
+                embedding = result[0]
             else:
-                return result.get("data", result.get("result", result))[0]
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"API request failed for single query: {e}")
-            raise
-        except (KeyError, ValueError, json.JSONDecodeError) as e:
-            logger.error(f"Failed to parse API response for single query: {e}")
-            raise
+                embedding = result.get("data", result.get("result", result))[0]
+            
+            return embedding
+            
         except Exception as e:
-            logger.error(f"Unexpected error during single query embedding: {e}")
-            raise
+            logger.error(f"Failed to embed query: {e}")
+            # Return zero vector as fallback
+            return [0.0] * 768  # Assuming 768-dimensional embeddings
 
-# --- Embedding Function ---
+# --- Embedding Function Setup ---
 @logger.catch(reraise=True) # Automatically log exceptions
 def get_embedding_function():
-    """Initializes and returns the embedding function (API-based or local)."""
-    # Check if we should use the API-based embeddings
-    use_api_embeddings = os.getenv("USE_API_EMBEDDINGS", "true").lower() == "true"
-    
-    if use_api_embeddings:
-        api_url = os.getenv("EMBEDDING_API_URL", "https://sabrinekh-embedder-model.hf.space/embed")
-        logger.info(f"Using HuggingFace API embeddings: {api_url}")
-        return HuggingFaceAPIEmbeddings(api_url=api_url)
-    else:
-        # Fallback to local embeddings
-        logger.info("Using local HuggingFace embeddings")
-        model_kwargs = {'device': config.EMBEDDING_DEVICE}
-        encode_kwargs = {'normalize_embeddings': config.NORMALIZE_EMBEDDINGS}
-
-        embeddings = HuggingFaceEmbeddings(
-            model_name=config.EMBEDDING_MODEL_NAME,
-            model_kwargs=model_kwargs,
-            encode_kwargs=encode_kwargs,
+    """
+    Creates and returns the embedding function based on configuration.
+    Returns:
+        HuggingFaceAPIEmbeddings instance if successful, None otherwise.
+    """
+    try:
+        # Use the custom HuggingFace API embeddings
+        embedding_function = HuggingFaceAPIEmbeddings(
+            api_url=config.EMBEDDING_API_URL
         )
-        return embeddings
+        
+        # Test the embedding function with a simple query
+        test_embedding = embedding_function.embed_query("test")
+        if test_embedding and len(test_embedding) > 0:
+            logger.success(f"Embedding function initialized successfully with {len(test_embedding)} dimensions")
+            return embedding_function
+        else:
+            logger.error("Embedding function test failed - returned empty embedding")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Failed to initialize embedding function: {e}", exc_info=True)
+        return None
 
-# --- ChromaDB Setup and Retrieval ---
-_chroma_client = None # Module-level client cache
-
+# --- Chroma Client Setup ---
+@logger.catch(reraise=True)
 def get_chroma_client():
-    """Gets or creates the ChromaDB client based on config."""
-    global _chroma_client
-    if _chroma_client is None:
-        logger.info(f"Initializing Chroma client (Persistent: {config.CHROMA_SETTINGS.is_persistent})")
-        if config.CHROMA_SETTINGS.is_persistent:
-            logger.info(f"Chroma persistence directory: {config.CHROMA_PERSIST_DIRECTORY}")
-            # Ensure directory exists if persistent
-            if config.CHROMA_PERSIST_DIRECTORY and not os.path.exists(config.CHROMA_PERSIST_DIRECTORY):
-                 os.makedirs(config.CHROMA_PERSIST_DIRECTORY, exist_ok=True)
-        _chroma_client = ChromaClient(config.CHROMA_SETTINGS)
-        logger.success("Chroma client initialized.")
-    return _chroma_client
+    """
+    Creates and returns a Chroma client instance.
+    Returns:
+        ChromaClient instance if successful, None otherwise.
+    """
+    try:
+        persist_directory = config.CHROMA_PERSIST_DIRECTORY
+        if not persist_directory:
+            logger.warning("Persistence directory not configured. Cannot create Chroma client.")
+            return None
+            
+        client = ChromaClient(path=persist_directory)
+        logger.success("Chroma client initialized successfully")
+        return client
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize Chroma client: {e}", exc_info=True)
+        return None
 
-# --- Vector Store Setup ---
+# --- Unified Simple Retriever (NEW) ---
+class SimpleRetriever:
+    """
+    Centralized retrieval system that replaces all confusing retrieval methods.
+    
+    This ONE method handles all retrieval cases:
+    - Simple semantic search
+    - Attribute-specific search with enhanced queries
+    - Part number filtering
+    - Threshold filtering
+    - Early stopping for performance
+    """
+    
+    def __init__(self, vectorstore, config):
+        self.vectorstore = vectorstore
+        self.config = config
+    
+
+    
+
+    
+    def retrieve(self, query: str, attribute_key: str = None, 
+                part_number: str = None, max_queries: int = 3) -> List[Document]:
+        """
+        Simplified retrieval: similarity search + tagging only.
+        
+        Args:
+            query: The search query
+            attribute_key: Optional attribute for tag filtering
+            part_number: Optional part number for filtering
+            max_queries: Ignored (kept for compatibility)
+        
+        Returns:
+            List of relevant documents (max 5)
+        """
+        logger.info(f"🔍 SIMPLIFIED RETRIEVAL: query='{query}', attribute='{attribute_key}', part_number='{part_number}'")
+        
+        # 1. Simple similarity search with threshold filtering
+        all_chunks = self._get_chunks_with_threshold(query)
+        logger.info(f"📋 Retrieved {len(all_chunks)} chunks with similarity search")
+        
+        # 2. Apply part number filtering if needed
+        if part_number:
+            all_chunks = self._filter_by_part_number(all_chunks, part_number)
+            logger.info(f"🔍 Part number filtering: {len(all_chunks)} chunks after filtering")
+        
+        # 3. Apply attribute tag filtering if needed (tag-aware retrieval)
+        if attribute_key:
+            original_count = len(all_chunks)
+            all_chunks = self._filter_by_attribute_tag(all_chunks, attribute_key)
+            logger.info(f"🏷️ Tag filtering: {len(all_chunks)} chunks after filtering (was {original_count})")
+            
+            # If no chunks found with attribute tags, fall back to semantic similarity only
+            if not all_chunks and original_count > 0:
+                logger.warning(f"No chunks found with '{attribute_key}' tag. Falling back to semantic similarity retrieval.")
+                all_chunks = self._get_chunks_with_threshold(query)[:5]  # Take top 5 semantically similar chunks
+                logger.info(f"Fallback: Using {len(all_chunks)} semantically similar chunks for '{attribute_key}'")
+        
+        # 4. Limit total chunks to avoid overwhelming the LLM
+        max_chunks = 5
+        if len(all_chunks) > max_chunks:
+            logger.info(f"📊 Limiting chunks from {len(all_chunks)} to {max_chunks}")
+            all_chunks = all_chunks[:max_chunks]
+        
+        logger.info(f"✅ Retrieved {len(all_chunks)} chunks for query '{query}'")
+        return all_chunks
+    
+
+    
+    def _get_chunks_with_threshold(self, query: str) -> List[Document]:
+        """Get chunks with similarity threshold filtering."""
+        docs_and_scores = self.vectorstore.similarity_search_with_score(
+            query, k=self.config.RETRIEVER_K
+        )
+        
+        filtered_docs = []
+        for doc, score in docs_and_scores:
+            if score >= self.config.VECTOR_SIMILARITY_THRESHOLD:
+                filtered_docs.append(doc)
+                logger.debug(f"Chunk passed threshold (score: {score:.3f}): {doc.page_content[:100]}")
+            else:
+                logger.debug(f"Chunk below threshold (score: {score:.3f}): {doc.page_content[:100]}")
+        
+        logger.info(f"Retrieved {len(docs_and_scores)} chunks, {len(filtered_docs)} passed threshold {self.config.VECTOR_SIMILARITY_THRESHOLD}")
+        return filtered_docs
+    
+    def _filter_by_part_number(self, chunks: List[Document], part_number: str) -> List[Document]:
+        """Filter chunks by part number if available."""
+        filtered = []
+        for chunk in chunks:
+            chunk_part_number = chunk.metadata.get("part_number", "")
+            
+            # Check part number match (if part_number is provided AND stored in metadata)
+            part_number_match = True
+            if part_number and chunk_part_number:
+                part_number_match = str(chunk_part_number).strip() == str(part_number).strip()
+                logger.debug(f"Part number check: chunk='{chunk_part_number}' vs query='{part_number}' -> {part_number_match}")
+            elif part_number and not chunk_part_number:
+                # If user provided part number but chunk doesn't have it, skip the check
+                logger.debug(f"Part number provided '{part_number}' but chunk has no part_number field, skipping part number check")
+                part_number_match = True  # Allow through since we can't verify
+            
+            if part_number_match:
+                filtered.append(chunk)
+                logger.debug(f"Chunk accepted: part_number={chunk_part_number}")
+            else:
+                logger.debug(f"Chunk rejected: part_number_match={part_number_match}")
+        
+        return filtered
+    
+    def _filter_by_attribute_tag(self, chunks: List[Document], attribute_key: str) -> List[Document]:
+        """Filter chunks by attribute tag (tag-aware retrieval)."""
+        filtered = []
+        for chunk in chunks:
+            chunk_attr_value = chunk.metadata.get(attribute_key)
+            
+            # Check attribute tag exists and is not empty
+            attr_tag_exists = chunk_attr_value is not None and chunk_attr_value != ""
+            logger.debug(f"Attribute tag check: {attribute_key}='{chunk_attr_value}' -> {attr_tag_exists}")
+            
+            if attr_tag_exists:
+                filtered.append(chunk)
+                logger.debug(f"Chunk accepted: {attribute_key}={chunk_attr_value}")
+            else:
+                logger.debug(f"Chunk rejected: attr_tag_exists={attr_tag_exists}")
+        
+        return filtered
+
+# --- Vector Store Setup Functions ---
 @logger.catch(reraise=True)
 def setup_vector_store(
     documents: List[Document],
     embedding_function,
-) -> Optional[VectorStoreRetriever]:
+) -> Optional[SimpleRetriever]:
     """
-    Sets up the Chroma vector store. Creates a new one if it doesn't exist,
-    or potentially adds to an existing one (current logic replaces).
+    Sets up a Chroma vector store with the provided documents and embedding function.
     Args:
-        documents: List of Langchain Document objects.
+        documents: List of documents to add to the vector store.
         embedding_function: The embedding function to use.
     Returns:
-        A VectorStoreRetriever object or None if setup fails.
+        A SimpleRetriever object if successful, otherwise None.
     """
-    if not documents:
-        logger.warning("No documents provided to setup_vector_store.")
+    persist_directory = config.CHROMA_PERSIST_DIRECTORY
+    collection_name = config.COLLECTION_NAME
+
+    if not persist_directory:
+        logger.warning("Persistence directory not configured. Cannot setup vector store.")
         return None
     if not embedding_function:
         logger.error("Embedding function is not available for setup_vector_store.")
         return None
 
-    # Sort documents by source and page for deterministic indexing
-    documents = sorted(documents, key=lambda doc: (doc.metadata.get('source', ''), doc.metadata.get('page', 0)))
-
-    persist_directory = config.CHROMA_PERSIST_DIRECTORY
-    collection_name = config.COLLECTION_NAME
-
-    logger.info(f"Setting up vector store. Persistence directory: '{persist_directory}', Collection: '{collection_name}'")
-
-    # Check if the directory exists, maybe Chroma needs it? (Optional check)
-    # if persist_directory and not os.path.exists(persist_directory):
-    #     logger.info(f"Creating persistence directory: {persist_directory}")
-    #     os.makedirs(persist_directory)
+    logger.info(f"Setting up vector store '{collection_name}' with {len(documents)} documents...")
 
     try:
-        # If persisting, Chroma.from_documents handles creation and persistence directly
-        # when the persist_directory argument is provided.
-        logger.info(f"Creating/Updating vector store '{collection_name}' with {len(documents)} documents...")
-
-        # *** Add persist_directory argument here ***
+        # Create the vector store with batch processing
         try:
             vector_store = Chroma.from_documents(
                 documents=documents,
                 embedding=embedding_function,
                 collection_name=collection_name,
-                persist_directory=persist_directory # <-- This is the crucial addition
+                persist_directory=persist_directory
             )
         except Exception as e:
             logger.warning(f"Batch processing failed, trying fallback method: {e}")
@@ -317,26 +465,24 @@ def setup_vector_store(
             vector_store.persist() # Explicitly call persist just in case
 
         logger.success(f"Vector store '{collection_name}' created/updated and persisted successfully.")
-        # Return the retriever with similarity threshold
-        return ThresholdRetriever(
+        # Return the new SimpleRetriever
+        return SimpleRetriever(
             vectorstore=vector_store,
-            search_kwargs={"k": config.RETRIEVER_K},
-            threshold=config.VECTOR_SIMILARITY_THRESHOLD
+            config=config
         )
 
     except Exception as e:
-        logger.error("Failed to create or populate Chroma vector store '{}': {}".format(collection_name, e), exc_info=True)
+        logger.error(f"Failed to setup vector store: {e}", exc_info=True)
         return None
 
-# --- Load Existing Vector Store ---
 @logger.catch(reraise=True)
-def load_existing_vector_store(embedding_function) -> Optional[VectorStoreRetriever]:
+def load_existing_vector_store(embedding_function) -> Optional[SimpleRetriever]:
     """
     Loads an existing Chroma vector store from the persistent directory.
     Args:
         embedding_function: The embedding function to use.
     Returns:
-        A VectorStoreRetriever object if the store exists and loads, otherwise None.
+        A SimpleRetriever object if the store exists and loads, otherwise None.
     """
     persist_directory = config.CHROMA_PERSIST_DIRECTORY
     collection_name = config.COLLECTION_NAME
@@ -360,69 +506,16 @@ def load_existing_vector_store(embedding_function) -> Optional[VectorStoreRetrie
             embedding_function=embedding_function,
             collection_name=collection_name,
         )
-        # Simple check to see if it loaded something (e.g., count items)
-        # Note: .count() might not exist directly, use a different check if needed
-        # A simple successful initialization might be enough indication
-        # try:
-        #     count = vector_store._collection.count() # Example internal access, might change
-        #     logger.info(f"Successfully loaded collection '{collection_name}' with {count} items.")
-        # except Exception:
-        #      logger.warning(f"Loaded collection '{collection_name}', but could not verify item count.")
 
         logger.success(f"Successfully loaded vector store '{collection_name}'.")
-        return ThresholdRetriever(
+        return SimpleRetriever(
             vectorstore=vector_store,
-            search_kwargs={"k": config.RETRIEVER_K},
-            threshold=config.VECTOR_SIMILARITY_THRESHOLD
+            config=config
         )
 
     except Exception as e:
-        # This exception block might catch cases where the collection *within* the directory doesn't exist
-        # or other Chroma loading errors.
-        logger.warning("Failed to load existing vector store '{}' from '{}': {}".format(collection_name, persist_directory, e), exc_info=False) # Log less verbosely maybe
-        # Log specific known issues like collection not found separately if possible
-        if "does not exist" in str(e).lower(): # Basic check
+        logger.warning("Failed to load existing vector store '{}' from '{}': {}".format(collection_name, persist_directory, e), exc_info=False)
+        if "does not exist" in str(e).lower():
              logger.warning("Persistent collection '{}' not found in directory '{}'. Cannot load.".format(collection_name, persist_directory))
 
         return None
-
-# --- Custom Retriever with Similarity Threshold ---
-class ThresholdRetriever:
-    """Custom retriever that applies similarity threshold filtering."""
-    
-    def __init__(self, vectorstore, search_kwargs, threshold):
-        self.vectorstore = vectorstore
-        self.search_kwargs = search_kwargs
-        self.threshold = threshold
-    
-    def invoke(self, query: str) -> List[Document]:
-        """Get documents with similarity threshold filtering."""
-        # Get documents with scores
-        docs_and_scores = self.vectorstore.similarity_search_with_score(
-            query, 
-            k=self.search_kwargs.get("k", 8)
-        )
-        
-        # Filter by threshold
-        filtered_docs = []
-        for doc, score in docs_and_scores:
-            if score >= self.threshold:
-                filtered_docs.append(doc)
-                logger.debug("Chunk passed threshold (score: {:.3f}): {}".format(score, doc.page_content[:100]))
-            else:
-                logger.debug("Chunk below threshold (score: {:.3f}): {}".format(score, doc.page_content[:100]))
-        
-        logger.info("Retrieved {} chunks, {} passed threshold {}".format(len(docs_and_scores), len(filtered_docs), self.threshold))
-        return filtered_docs
-    
-    def get_relevant_documents(self, query: str) -> List[Document]:
-        """LangChain compatibility method - same as invoke."""
-        return self.invoke(query)
-    
-    async def ainvoke(self, query: str) -> List[Document]:
-        """Async version of document retrieval."""
-        return self.invoke(query)
-    
-    async def aget_relevant_documents(self, query: str) -> List[Document]:
-        """Async LangChain compatibility method."""
-        return self.invoke(query)

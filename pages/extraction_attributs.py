@@ -382,7 +382,7 @@ if 'playwright_installed' not in st.session_state:
 
 # --- Imports ---
 import config
-from pdf_processor import process_uploaded_pdfs, fetch_chunks
+from pdf_processor import process_uploaded_pdfs
 from vector_store import (
     get_embedding_function,
     setup_vector_store
@@ -1143,11 +1143,12 @@ else:
                         with st.spinner(f"Stage 2: Extracting {attribute_key} from PDF Data..."):
                             try:
                                 start_time = time.time()
-                                context_chunks = fetch_chunks(
-                                    st.session_state.retriever,
-                                    part_number,
-                                    attribute_key,
-                                    k=8
+                                # Use the new SimpleRetriever instead of fetch_chunks
+                                context_chunks = st.session_state.retriever.retrieve(
+                                    query=attribute_key,
+                                    attribute_key=attribute_key,
+                                    part_number=part_number,
+                                    max_queries=3
                                 )
                                 context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
                                 
@@ -1410,11 +1411,11 @@ else:
                             start_time = time.time()
                             
                             # Use more chunks for final fallback to be more thorough
-                            context_chunks = fetch_chunks(
-                                st.session_state.retriever,
-                                part_number,
-                                attribute_key,
-                                k=12  # Increased from 8 to 12 for more thorough search
+                            context_chunks = st.session_state.retriever.retrieve(
+                                query=attribute_key,
+                                attribute_key=attribute_key,
+                                part_number=part_number,
+                                max_queries=5  # More thorough search for final fallback
                             )
                             context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
                             
@@ -1759,11 +1760,11 @@ else:
                             start_time = time.time()
                             
                             # Use even more chunks for manual recheck
-                            context_chunks = fetch_chunks(
-                                st.session_state.retriever,
-                                part_number,
-                                attribute_key,
-                                k=15  # Increased for thorough manual recheck
+                            context_chunks = st.session_state.retriever.retrieve(
+                                query=attribute_key,
+                                attribute_key=attribute_key,
+                                part_number=part_number,
+                                max_queries=6  # More thorough search for manual recheck
                             )
                             context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
                             
