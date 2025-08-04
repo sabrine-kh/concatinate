@@ -394,12 +394,10 @@ from llm_interface import (
     _invoke_chain_and_process,
     scrape_website_table_html,
     create_numind_extraction_chain,
-    extract_with_numind_from_bytes,
-    extract_with_numind_using_schema,
-    get_default_extraction_schema,
+    extract_with_numind_using_template,
     extract_specific_attribute_from_numind_result
 )
-from numind_schema_config import get_custom_schema, get_custom_instructions
+from numind_schema_config import get_custom_template
 # Import the prompts
 from extraction_prompts import (
     # Material Properties
@@ -918,8 +916,8 @@ else:
                             debug_logger.llm_request(
                                 f"Extract {attribute_key} from web data",
                                 "web_chain",
-                                0.7,
-                                1000,
+                                0.0,
+                                8192,
                                 context={"step": "stage1_llm_request", "attribute": attribute_key}
                             )
                             
@@ -1147,8 +1145,7 @@ else:
                                 context_chunks = st.session_state.retriever.retrieve(
                                     query=attribute_key,
                                     attribute_key=attribute_key,
-                                    part_number=part_number,
-                                    max_queries=3
+                                    part_number=part_number
                                 )
                                 context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
                                 
@@ -1236,19 +1233,16 @@ else:
                                 "attributes_count": len(pdf_fallback_needed)
                             }, context={"step": "stage2_numind_start"})
                             
-                            # Get the custom extraction schema that matches your NuMind playground
-                            extraction_schema = get_custom_schema()
-                            
-                            # Run NuMind extraction with your custom schema
+                            # Run NuMind template-based extraction
                             numind_result = loop.run_until_complete(
-                                extract_with_numind_using_schema(st.session_state.numind_chain, file_data, extraction_schema)
+                                extract_with_numind_using_template(st.session_state.numind_chain, file_data)
                             )
                             
                             run_time = time.time() - start_time
                             
                             debug_logger.info("NuMind extraction completed", data={
                                 "duration": run_time,
-                                "result_keys": list(numind_result.keys()) if numind_result else []
+                                "result_keys": list(numind_result.keys()) if numind_result and isinstance(numind_result, dict) else []
                             }, context={"step": "stage2_numind_complete"})
                             
                             if numind_result:
@@ -1360,7 +1354,8 @@ else:
                 
                 # Check for attributes that need final fallback
                 if (is_not_found or 
-                    extracted_value in ["NOT FOUND", "Error", "Processing Error", "Unexpected JSON Format", "Unexpected JSON Type"] or
+                    extracted_value in ["NOT FOUND", "Error", "Processing Error", "Unexpected JSON Format", "Unexpected JSON Type", "NuMind Extraction Failed"] or
+                    extracted_value.startswith("NuMind Error:") or
                     not extracted_value or 
                     extracted_value.strip() == "" or
                     extracted_value == "(Web Stage Skipped)" or
@@ -1414,8 +1409,7 @@ else:
                             context_chunks = st.session_state.retriever.retrieve(
                                 query=attribute_key,
                                 attribute_key=attribute_key,
-                                part_number=part_number,
-                                max_queries=5  # More thorough search for final fallback
+                                part_number=part_number
                             )
                             context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
                             
@@ -1443,8 +1437,8 @@ else:
                             debug_logger.llm_request(
                                 f"Final fallback extraction for {attribute_key}",
                                 "pdf_chain",
-                                0.7,
-                                1500,  # Increased token limit for more thorough analysis
+                                0.0,
+                                8192,  # Increased token limit for more thorough analysis
                                 context={"step": "stage3_llm_request", "attribute": attribute_key}
                             )
                             
@@ -1763,8 +1757,7 @@ else:
                             context_chunks = st.session_state.retriever.retrieve(
                                 query=attribute_key,
                                 attribute_key=attribute_key,
-                                part_number=part_number,
-                                max_queries=6  # More thorough search for manual recheck
+                                part_number=part_number
                             )
                             context_text = "\n\n".join([chunk.page_content for chunk in context_chunks]) if context_chunks else ""
                             
@@ -1883,6 +1876,7 @@ else:
                             logger.error(f"Manual recheck failed for '{attribute_key}': {e}", exc_info=True)
                 
                 st.success("Manual recheck completed!")
+                update_thinking_log("Manual Recheck Complete", f"Manual recheck completed for {len(selected_for_recheck)} attributes. Results updated.", is_active=False, reset_time=False, placeholder=st.session_state['log_placeholder'])
                 st.rerun()  # Refresh to show updated results
         else:
             st.success("All attributes have been successfully extracted! No manual recheck needed.")

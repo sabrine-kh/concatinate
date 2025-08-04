@@ -5,15 +5,7 @@ import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import os
-import time
-from loguru import logger
-import json # Import the json library
-import pandas as pd # Add pandas import
-import re # Import the 're' module for regular expressions
-import asyncio # Add asyncio import
-import subprocess # To run playwright install
 import nest_asyncio # Add nest_asyncio for better async handling
-from streamlit.runtime.scriptrunner import add_script_run_ctx
 import streamlit as st
 
 # Apply nest_asyncio to allow nested event loops
@@ -28,28 +20,28 @@ def main():
         [data-testid="stSidebarNav"] {display: none;}
         
         /* Blue band header styling */
-        .header-band {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
-            color: white;
-            padding: 2rem 0;
-            margin: -1rem -1rem 2rem -1rem;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
-        }
-        
-        .header-band h1 {
-            font-size: 3.5em;
-            margin: 0;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .header-band h2 {
-            font-size: 1.8em;
-            margin: 0.5rem 0 0 0;
-            font-weight: 300;
-            opacity: 0.9;
-        }
+    .header-band {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a90e2 100%);
+        color: white;
+        padding: 0.1rem 0;
+        margin: 0 0 0.2rem 0;
+        text-align: center;
+        box-shadow: 0 2px 6px rgba(30, 60, 114, 0.15);
+    }
+    
+    .header-band h1 {
+        font-size: 2em;
+        margin: 0;
+        font-weight: bold;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .header-band h2 {
+        font-size: 1.2em;
+        margin: 0.1rem 0 0 0;
+        font-weight: 300;
+        opacity: 0.9;
+    }
         
         /* Button styling with blue theme */
         .stButton > button {
@@ -77,7 +69,7 @@ def main():
         /* Welcome section styling */
         .welcome-section {
             text-align: center;
-            padding: 3rem 0;
+            padding: 1rem 0;
         }
         
         .welcome-section h2 {
@@ -90,6 +82,9 @@ def main():
             color: #2a5298;
             font-size: 1.3em;
             margin-bottom: 2rem;
+        }
+        body .block-container, .main .block-container {
+            /* Removed forced padding and width, revert to Streamlit default */
         }
         </style>""",
         unsafe_allow_html=True
@@ -104,8 +99,6 @@ def main():
             st.switch_page("pages/extraction_attributs.py")
         if st.button("🔍 Debug Interface"):
             st.switch_page("debug_interface.py")
-        if st.button("📊 Debug Summary"):
-            st.switch_page("debug_summary.py")
     
     # Blue band header with LEONI
     st.markdown("""

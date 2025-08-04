@@ -21,17 +21,14 @@ VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "mistral-small-latest")
 
 # --- Embedding Configuration ---
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3")
-EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu") # Add this line ('cpu' is default, 'cuda' if GPU available and configured)
-NORMALIZE_EMBEDDINGS = True # Add this line (Often recommended for sentence transformers)
-# EMBEDDING_CACHE_DIR = os.getenv("EMBEDDING_CACHE_DIR", "./embedding_cache") # Optional: Specify cache dir
 
 # --- API Embedding Configuration ---
 USE_API_EMBEDDINGS = os.getenv("USE_API_EMBEDDINGS", "true").lower() == "true"
-EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://sabrinekh-embedder-model.hf.space/embed")
+EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://hbaananou-embedder-model.hf.space/embed")
 EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", 1024))  # Default to 1024 for BAAI/bge-m3
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", 5))  # Reduced default for large files
 EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", 120))  # Increased timeout for large files
-EMBEDDING_MAX_TEXT_LENGTH = int(os.getenv("EMBEDDING_MAX_TEXT_LENGTH", 4000))  # Max characters per text
+EMBEDDING_MAX_TEXT_LENGTH = int(os.getenv("EMBEDDING_MAX_TEXT_LENGTH", 30000))  # Max characters per text
 
 # --- Vector Store Configuration ---
 # Define the persistence directory (can be None for in-memory)
@@ -41,6 +38,9 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "pdf_qa_prod_collection") # Use t
 # *** Calculate the is_persistent flag ***
 is_persistent = bool(CHROMA_PERSIST_DIRECTORY) # True if directory is set, False otherwise
 
+# --- Text Splitting Configuration ---
+# CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", (1000)))  # Restored
+# CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 200))  # Restored
 
 # --- Retriever Configuration ---
 RETRIEVER_K = int(os.getenv("RETRIEVER_K", 8)) # Renamed from RETRIEVER_SEARCH_K
