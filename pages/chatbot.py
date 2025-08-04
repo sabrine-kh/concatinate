@@ -403,6 +403,7 @@ def get_groq_chat_response(prompt, context_provided=True):
             "IMPORTANT: When the database returns part numbers (especially for date-based queries), present them clearly. "
             "Do not say information is not available if part numbers are returned. "
             "For date-based queries, format the response as: 'Here are the part numbers [created/modified] in [year]: [list of part numbers]' "
+            "When answering questions about definitions or concepts from documentation, provide clear, concise explanations without mentioning database attributes. "
             "Do not add any extra explanations or formatting."
         )
     else:
@@ -516,8 +517,8 @@ def llm_choose_tool(question, llm):
     prompt = (
         "You are a router for a chatbot. "
         "Given the following user question, decide which tool should be used to answer it. "
-        "If the question is about part numbers, attributes, or database lookups, answer 'SQL'. "
-        "If the question is about definitions, explanations, or general knowledge, answer 'VECTOR'. "
+        "If the question is about specific part numbers, attributes, or database lookups (like 'What is the color of part P123456?'), answer 'SQL'. "
+        "If the question is about definitions, explanations, concepts, or general knowledge (like 'What is Number Of Fuse-Circuits?'), answer 'VECTOR'. "
         "Answer with only 'SQL' or 'VECTOR'.\n\n"
         f"User question: {question}\nTool:"
     )
@@ -576,8 +577,12 @@ def run_chatbot():
                         relevant_attribute_rows = find_relevant_attributes_with_sql(generated_sql)
                         logging.info(f"[LOG] SQL tool returned rows: {len(relevant_attribute_rows)}")
                         context_was_found = bool(relevant_attribute_rows)
-                    relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
-                    logging.info(f"[LOG] Vector tool (for context) returned chunks: {len(relevant_markdown_chunks)}")
+                    # Only add markdown context if no SQL results found
+                    if not relevant_attribute_rows:
+                        relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
+                        logging.info(f"[LOG] Vector tool (fallback) returned chunks: {len(relevant_markdown_chunks)}")
+                        if relevant_markdown_chunks:
+                            context_was_found = True
                 else:
                     relevant_markdown_chunks = find_relevant_markdown_chunks(prompt, limit=3)
                     logging.info(f"[LOG] Vector tool returned chunks: {len(relevant_markdown_chunks)}")
@@ -600,12 +605,14 @@ def run_chatbot():
                 if relevant_attribute_rows:
                     extra_instruction = (
                         "Present your answer as a clear, concise sentence, followed by the table if relevant. "
-                        "Do not add any meta-comments or explanations about where the data comes from.\n"
+                        "Do not add any meta-comments or explanations about where the data comes from. "
+                        "Do not mention that information is not available in the database if you have found relevant data.\n"
                     )
                 else:
                     extra_instruction = (
-                        "Present your answer as a clear, concise sentence. "
-                        "Do not add any meta-comments or explanations about where the data comes from.\n"
+                        "Present your answer as a clear, concise sentence based on the documentation provided. "
+                        "Do not add any meta-comments or explanations about where the data comes from. "
+                        "Do not mention database attributes or say information is not available in the database.\n"
                     )
                 extra_instruction += (
     "If an attribute value is None, null, or empty, display it as None (not as 'Not provided' or any other phrase). "
@@ -620,7 +627,6 @@ User Question: {prompt}
 
 When answering, always use the conversation history to resolve references (such as pronouns or phrases like 'this part number') to the correct entities mentioned earlier. 
 Answer the user question based *only* on the provided context and the conversation history. 
-If you have information from both database attributes and documentation, synthesize them to provide a comprehensive answer. 
 {extra_instruction}When using documentation context, quote or closely follow the original wording and structure whenever possible. 
 Only summarize or paraphrase when necessary for clarity, and do not add information not present in the context.
 """
