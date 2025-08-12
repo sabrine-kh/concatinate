@@ -418,6 +418,7 @@ async def extract_with_numind_using_template(client, file_bytes: bytes) -> Optio
         logger.warning("NuMind extraction skipped: missing client or file_bytes")
         return None
         
+        
     try:
         logger.info(f"Starting NuMind template-based extraction from file bytes (size: {len(file_bytes)})")
         

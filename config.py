@@ -24,7 +24,7 @@ EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3")
 
 # --- API Embedding Configuration ---
 USE_API_EMBEDDINGS = os.getenv("USE_API_EMBEDDINGS", "true").lower() == "true"
-EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://hbaananou-embedder-model.hf.space/embed")
+EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "https://sabrinekh-embedder-model.hf.space/embed")
 EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", 1024))  # Default to 1024 for BAAI/bge-m3
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", 5))  # Reduced default for large files
 EMBEDDING_TIMEOUT = int(os.getenv("EMBEDDING_TIMEOUT", 120))  # Increased timeout for large files

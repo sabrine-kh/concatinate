@@ -145,7 +145,7 @@ except Exception as e:
 # if len(test_emb) != EMBEDDING_DIMENSIONS:
 #     raise ValueError("Embedding dimension mismatch")
 
-HF_API_URL = "https://hbaananou-embedder-model.hf.space/embed"  # Updated to custom endpoint
+HF_API_URL = "https://sabrinekh-embedder-model.hf.space/embed"  # Updated to custom endpoint
 HF_TOKEN = st.secrets["HF_TOKEN"]
 
 def get_query_embedding(text):

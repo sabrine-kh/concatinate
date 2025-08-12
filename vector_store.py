@@ -12,7 +12,7 @@ import config # Import configuration
 class HuggingFaceAPIEmbeddings(Embeddings):
     """Custom embeddings class that uses Hugging Face API instead of local model."""
     
-    def __init__(self, api_url: str = "https://hbaananou-embedder-model.hf.space/embed"):
+    def __init__(self, api_url: str = "https://sabrinekh-embedder-model.hf.space/embed"):
         self.api_url = api_url
         logger.info(f"Initialized HuggingFace API embeddings with URL: {api_url}")
     
@@ -301,7 +301,7 @@ class SimpleRetriever:
             all_chunks = all_chunks[:max_chunks]
         
         logger.info(f"✅ Retrieved {len(all_chunks)} chunks for query '{query}'")
-        return all_chunks
+        return all_chunks 
     
 
     
