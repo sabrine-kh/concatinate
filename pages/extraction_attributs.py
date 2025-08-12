@@ -1407,7 +1407,7 @@ else:
                             
                             # Use  chunks for final fallback to be more thorough
                             context_chunks = st.session_state.retriever.retrieve(
-                                query=attribute_key,
+                                query=pdf_instruction,
                                 attribute_key=attribute_key,
                                 part_number=part_number
                             )
@@ -1756,7 +1756,7 @@ else:
                             
                             # Use even more chunks for manual recheck
                             context_chunks = st.session_state.retriever.retrieve(
-                                query=attribute_key,
+                                query=pdf_instruction,
                                 attribute_key=attribute_key,
                                 part_number=part_number
                             )
