@@ -1405,7 +1405,7 @@ else:
                         try:
                             start_time = time.time()
                             
-                            # Use  chunks for final fallback to be more thorough
+                            # Use more chunks for final fallback to be more thorough
                             context_chunks = st.session_state.retriever.retrieve(
                                 query=pdf_instruction,
                                 attribute_key=attribute_key,
@@ -1746,8 +1746,7 @@ else:
                 
                 # Run manual recheck
                 for prompt_name in selected_for_recheck:
-                    attribute_key = 
-                    
+                    attribute_key = prompt_name
                     pdf_instruction = prompts_to_run[attribute_key]["pdf"]
                     
                     with st.spinner(f"Manual recheck for {attribute_key}..."):
