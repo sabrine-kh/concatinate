@@ -97,8 +97,8 @@ def main():
             st.switch_page("pages/chatbot.py")
         if st.button("📄 Extract a new Part"):
             st.switch_page("pages/extraction_attributs.py")
-        if st.button("🔍 Debug Interface"):
-            st.switch_page("debug_interface.py")
+        # if st.button("🔍 Debug Interface"):
+        #     st.switch_page("debug_interface.py")
     
     # Blue band header with LEONI
     st.markdown("""

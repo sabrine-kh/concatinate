@@ -69,8 +69,8 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.last_part_number = None
         st.rerun()
-    if st.button("📊 Evaluate Doc Search"):
-        st.switch_page("pages/evaluate_doc_search.py")
+    # if st.button("📊 Evaluate Doc Search"):
+    #     st.switch_page("pages/evaluate_doc_search.py")
 
 # Add navigation button at the top
 if st.sidebar.button("← Back to Main App", use_container_width=True):
